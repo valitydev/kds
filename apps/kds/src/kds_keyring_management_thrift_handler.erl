@@ -1,4 +1,4 @@
--module(kds_keyring_v2_thrift_handler).
+-module(kds_keyring_management_thrift_handler).
 -behaviour(woody_server_thrift_handler).
 
 -include_lib("cds_proto/include/cds_proto_keyring_thrift.hrl").
@@ -17,7 +17,7 @@
 
 handle_function(OperationID, Args, Context, Opts) ->
     scoper:scope(
-        keyring_v2,
+        keyring_management,
         fun() -> handle_function_(OperationID, Args, Context, Opts) end
     ).
 
@@ -81,6 +81,8 @@ handle_function_('ConfirmUnlock', [ShareholderId, Share], _Context, _Opts) ->
             raise(#'VerificationFailed'{});
         {invalid_status, Status} ->
             raise(#'InvalidStatus'{status = Status});
+        {invalid_activity, Activity} ->
+            raise(#'InvalidActivity'{activity = Activity});
         {operation_aborted, Reason} ->
             raise(#'OperationAborted'{reason = atom_to_binary(Reason, utf8)})
     end;
@@ -108,6 +110,8 @@ handle_function_('ConfirmRotate', [ShareholderId, Share], _Context, _Opts) ->
             raise(#'VerificationFailed'{});
         {invalid_status, Status} ->
             raise(#'InvalidStatus'{status = Status});
+        {invalid_activity, Activity} ->
+            raise(#'InvalidActivity'{activity = Activity});
         {operation_aborted, Reason} ->
             raise(#'OperationAborted'{reason = atom_to_binary(Reason, utf8)})
     end;
@@ -175,7 +179,25 @@ handle_function_('GetState', [], _Context, _Opts) ->
     case kds_keyring_manager:get_status() of
         Status ->
             {ok, encode_state(Status)}
-    end.
+    end;
+
+handle_function_('UpdateKeyringMeta', [KeyringMeta], _Context, _Opts) ->
+    try
+        DecodedKeyringMeta = kds_keyring_meta:decode_keyring_meta_diff(KeyringMeta),
+        kds_keyring_manager:update_meta(DecodedKeyringMeta)
+    of
+        ok ->
+            {ok, ok}
+    catch
+        {invalid_status, Status} ->
+            raise(#'InvalidStatus'{status = Status});
+        {validation_failed, Reason} ->
+            raise(#'InvalidKeyringMeta'{reason = erlang:atom_to_binary(Reason, utf8)})
+    end;
+handle_function_('GetKeyringMeta', [], _Context, _Opts) ->
+    KeyringMeta = kds_keyring_manager:get_meta(),
+    EncodedKeyringMeta = kds_keyring_meta:encode_keyring_meta(KeyringMeta),
+    {ok, EncodedKeyringMeta}.
 
 -spec encode_encrypted_shares([kds_keysharing:encrypted_master_key_share()]) ->
     [encrypted_masterkey_share()].

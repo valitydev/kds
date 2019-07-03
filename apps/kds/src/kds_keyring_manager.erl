@@ -22,6 +22,8 @@
 -export([validate_rekey/2]).
 -export([cancel_rekey/0]).
 -export([get_status/0]).
+-export([update_meta/1]).
+-export([get_meta/0]).
 
 %% gen_statem.
 -export([init/1]).
@@ -35,7 +37,10 @@
 -define(STATEM, ?MODULE).
 
 -record(data, {
-    keyring :: kds_keyring:keyring() | undefined
+    keyring :: #{
+        data := undefined | kds_keyring:keyring_data(),
+        meta := undefined | kds_keyring_meta:keyring_meta()
+    }
 }).
 
 -type data() :: #data{}.
@@ -68,7 +73,7 @@ start_unlock() ->
     call(start_unlock).
 
 -spec confirm_unlock(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, non_neg_integer()} | ok.
+    {more, pos_integer()} | ok.
 confirm_unlock(ShareholderId, Share) ->
     call({confirm_unlock, ShareholderId, Share}).
 
@@ -85,7 +90,7 @@ start_rotate() ->
     call(start_rotate).
 
 -spec confirm_rotate(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, non_neg_integer()} | ok.
+    {more, pos_integer()} | ok.
 confirm_rotate(ShareholderId, Share) ->
     call({confirm_rotate, ShareholderId, Share}).
 
@@ -98,7 +103,7 @@ initialize(Threshold) ->
     call({initialize, Threshold}).
 
 -spec validate_init(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, non_neg_integer()} | ok.
+    {more, pos_integer()} | ok.
 validate_init(ShareholderId, Share) ->
     call({validate_init, ShareholderId, Share}).
 
@@ -111,7 +116,7 @@ start_rekey(Threshold) ->
     call({start_rekey, Threshold}).
 
 -spec confirm_rekey(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, non_neg_integer()} | ok.
+    {more, pos_integer()} | ok.
 confirm_rekey(ShareholderId, Share) ->
     call({confirm_rekey, ShareholderId, Share}).
 
@@ -120,7 +125,7 @@ start_validate_rekey() ->
     call(start_validate_rekey).
 
 -spec validate_rekey(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, non_neg_integer()} | ok.
+    {more, pos_integer()} | ok.
 validate_rekey(ShareholderId, Share) ->
     call({validate_rekey, ShareholderId, Share}).
 
@@ -131,6 +136,14 @@ cancel_rekey() ->
 -spec get_status() -> status().
 get_status() ->
     call(get_status).
+
+-spec update_meta(kds_keyring_meta:keyring_meta_diff()) -> ok.
+update_meta(KeyringMeta) ->
+    call({update_meta, KeyringMeta}).
+
+-spec get_meta() -> kds_keyring_meta:keyring_meta().
+get_meta() ->
+    call(get_meta).
 
 call(Event) ->
     case gen_statem:call(?STATEM, Event) of
@@ -147,11 +160,11 @@ call(Event) ->
 -spec init(_) -> {ok, locked | not_initialized, data()}.
 init([]) ->
     try kds_keyring_storage:read() of
-        _Keyring ->
-            {ok, locked, #data{keyring = undefined}}
+        #{meta := KeyringMeta} ->
+            {ok, locked, #data{keyring = #{data => undefined, meta => KeyringMeta}}}
     catch
         not_found ->
-            {ok, not_initialized, #data{}}
+            {ok, not_initialized, #data{keyring = #{data => undefined, meta => undefined}}}
     end.
 
 -spec handle_event(gen_statem:event_type(), term(), state(), data()) ->
@@ -180,15 +193,15 @@ handle_event({call, From}, cancel_init, not_initialized, _StateData) ->
 %% locked events
 
 handle_event({call, From}, start_unlock, locked, _StateData) ->
-    LockedKeyring = kds_keyring_storage:read(),
-    Result = kds_keyring_unlocker:initialize(LockedKeyring),
+    Result = kds_keyring_unlocker:initialize(),
     {keep_state_and_data, {reply, From, Result}};
 handle_event({call, From}, {confirm_unlock, ShareholderId, Share}, locked, StateData) ->
-    case kds_keyring_unlocker:confirm(ShareholderId, Share) of
+    LockedKeyring = kds_keyring_storage:read(),
+    case kds_keyring_unlocker:confirm(ShareholderId, Share, LockedKeyring) of
         {ok, {more, _More}} = Result ->
             {keep_state_and_data, {reply, From, Result}};
-        {ok, {done, UnlockedKeyring}} ->
-            NewStateData = StateData#data{keyring = UnlockedKeyring},
+        {ok, {done, Keyring}} ->
+            NewStateData = StateData#data{keyring = Keyring},
             {next_state, unlocked, NewStateData, {reply, From, ok}};
         {error, Error} ->
             {keep_state_and_data, {reply, From, {error, Error}}}
@@ -199,20 +212,21 @@ handle_event({call, From}, cancel_unlock, locked, _StateData) ->
 
 %% unlocked events
 
-handle_event({call, From}, lock, unlocked, StateData) ->
-    {next_state, locked, StateData#data{keyring = undefined}, {reply, From, ok}};
+handle_event({call, From}, lock, unlocked, #data{keyring = Keyring} = StateData) ->
+    {next_state, locked, StateData#data{keyring = Keyring#{data => undefined}}, {reply, From, ok}};
 handle_event({call, From}, get_keyring, unlocked, #data{keyring = Keyring}) ->
     {keep_state_and_data, {reply, From, {ok, Keyring}}};
-handle_event({call, From}, start_rotate, unlocked, #data{keyring = OldKeyring}) ->
-    EncryptedKeyring = kds_keyring_storage:read(),
-    Result = kds_keyring_rotator:initialize(OldKeyring, EncryptedKeyring),
+handle_event({call, From}, start_rotate, unlocked, _StateData) ->
+    Result = kds_keyring_rotator:initialize(),
     {keep_state_and_data, {reply, From, Result}};
-handle_event({call, From}, {confirm_rotate, ShareholderId, Share}, unlocked, StateData) ->
-    case kds_keyring_rotator:confirm(ShareholderId, Share) of
+handle_event({call, From}, {confirm_rotate, ShareholderId, Share}, unlocked,
+    #data{keyring = OldKeyring} = StateData) ->
+    EncryptedKeyring = kds_keyring_storage:read(),
+    case kds_keyring_rotator:confirm(ShareholderId, Share, EncryptedKeyring, OldKeyring) of
         {ok, {more, _More}} = Result ->
             {keep_state_and_data, {reply, From, Result}};
-        {ok, {done, {EncryptedNewKeyring, NewKeyring}}} ->
-            ok = kds_keyring_storage:update(EncryptedNewKeyring),
+        {ok, {done, {NewEncryptedKeyring, NewKeyring}}} ->
+            ok = kds_keyring_storage:update(NewEncryptedKeyring),
             NewStateData = StateData#data{keyring = NewKeyring},
             {keep_state, NewStateData, {reply, From, ok}};
         {error, Error} ->
@@ -222,21 +236,21 @@ handle_event({call, From}, cancel_rotate, unlocked, _StateData) ->
     ok = kds_keyring_rotator:cancel(),
     {keep_state_and_data, {reply, From, ok}};
 handle_event({call, From}, {start_rekey, Threshold}, unlocked, _StateData) ->
-    EncryptedKeyring = kds_keyring_storage:read(),
-    Result = kds_keyring_rekeyer:initialize(Threshold, EncryptedKeyring),
+    Result = kds_keyring_rekeyer:initialize(Threshold),
     {keep_state_and_data, {reply, From, Result}};
 handle_event({call, From}, {confirm_rekey, ShareholderId, Share}, unlocked, _StateData) ->
-    Result =  kds_keyring_rekeyer:confirm(ShareholderId, Share),
+    EncryptedKeyring = kds_keyring_storage:read(),
+    Result =  kds_keyring_rekeyer:confirm(ShareholderId, Share, EncryptedKeyring),
     {keep_state_and_data, {reply, From, Result}};
-handle_event({call, From}, start_validate_rekey, unlocked, _StateData) ->
-    Result = kds_keyring_rekeyer:start_validation(),
+handle_event({call, From}, start_validate_rekey, unlocked, #data{keyring = Keyring}) ->
+    Result = kds_keyring_rekeyer:start_validation(Keyring),
     {keep_state_and_data, {reply, From, Result}};
-handle_event({call, From}, {validate_rekey, ShareholderId, Share}, unlocked, _StateData) ->
-    case kds_keyring_rekeyer:validate(ShareholderId, Share) of
+handle_event({call, From}, {validate_rekey, ShareholderId, Share}, unlocked, #data{keyring = Keyring}) ->
+    case kds_keyring_rekeyer:validate(ShareholderId, Share, Keyring) of
         {ok, {more, _More}} = Result ->
             {keep_state_and_data, {reply, From, Result}};
-        {ok, {done, EncryptedNewKeyring}} ->
-            ok = kds_keyring_storage:update(EncryptedNewKeyring),
+        {ok, {done, EncryptedKeyring}} ->
+            ok = kds_keyring_storage:update(EncryptedKeyring),
             {keep_state_and_data, {reply, From, ok}};
         {error, Error} ->
             {keep_state_and_data, {reply, From, {error, Error}}}
@@ -245,11 +259,28 @@ handle_event({call, From}, cancel_rekey, unlocked, _StateData) ->
     ok = kds_keyring_rekeyer:cancel(),
     {keep_state_and_data, {reply, From, ok}};
 
+%% common events
+
 handle_event({call, From}, get_status, State, _Data) ->
     {keep_state_and_data, {reply, From, {ok, generate_status(State)}}};
+handle_event({call, From}, {update_meta, _UpdateKeyringMeta}, not_initialized, _StateData) ->
+    {keep_state_and_data, {reply, From, {error, {invalid_status, not_initialized}}}};
+handle_event({call, From}, {update_meta, UpdateKeyringMeta}, _State,
+    #data{keyring = #{meta := KeyringMeta} = Keyring} = Data) ->
+    case kds_keyring_meta:update_meta(KeyringMeta, UpdateKeyringMeta) of
+        KeyringMeta ->
+            {keep_state_and_data, {reply, From, {ok, ok}}};
+        NewKeyringMeta ->
+            EncryptedKeyring = kds_keyring_storage:read(),
+            NewEncryptedKeyring = EncryptedKeyring#{meta => NewKeyringMeta},
+            ok = kds_keyring_storage:update(NewEncryptedKeyring),
+            NewKeyring = Keyring#{meta => NewKeyringMeta},
+            {keep_state, Data#data{keyring = NewKeyring}, {reply, From, {ok, ok}}}
+    end;
+handle_event({call, From}, get_meta, _State, #data{keyring = #{meta := KeyringMeta}}) ->
+    {keep_state_and_data, {reply, From, {ok, KeyringMeta}}};
 handle_event({call, From}, _Event, State, _StateData) ->
     {keep_state_and_data, {reply, From, {error, {invalid_status, State}}}}.
-
 
 -spec generate_status(atom()) -> status().
 generate_status(StateName) ->

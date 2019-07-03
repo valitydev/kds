@@ -42,7 +42,7 @@
 %% tests descriptions
 %%
 
--type config() :: term().
+-type config() :: [tuple()].
 
 -spec test() -> _.
 
@@ -257,6 +257,10 @@ unlock(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(ok, kds_keyring_client:start_unlock(root_url(C))),
     _ = ?assertEqual({more_keys_needed, 1}, kds_keyring_client:confirm_unlock(Id1, MasterKey1, root_url(C))),
+    _ = ?assertEqual(
+        {error, {invalid_activity, {unlock, validation}}},
+        kds_keyring_client:start_unlock(root_url(C))
+    ),
     State = kds_keyring_client:get_state(root_url(C)),
     _ = ?assertMatch(
         #{
@@ -289,6 +293,10 @@ unlock_with_timeout(C) ->
     _ = ?assertEqual({more_keys_needed, 1}, kds_keyring_client:confirm_unlock(Id1, MasterKey1, root_url(C))),
     Timeout = genlib_app:env(kds, keyring_unlock_lifetime, 1000),
     timer:sleep(Timeout + 500),
+    _ = ?assertEqual(
+        {error, {invalid_activity, {unlock, uninitialized}}},
+        kds_keyring_client:confirm_unlock(Id1, MasterKey1, root_url(C))
+    ),
     _ = ?assertEqual(ok, kds_keyring_client:start_unlock(root_url(C))),
     _ = ?assertEqual({more_keys_needed, 1}, kds_keyring_client:confirm_unlock(Id1, MasterKey1, root_url(C))),
     _ = ?assertEqual(ok, kds_keyring_client:confirm_unlock(Id2, MasterKey2, root_url(C))).
@@ -381,10 +389,14 @@ rekey_with_timeout(C) ->
 -spec rekey_with_cancel(config()) -> _.
 
 rekey_with_cancel(C) ->
+    [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
+    _ = ?assertEqual(
+        {error, {invalid_activity, {rekeying, uninitialized}}},
+        kds_keyring_client:confirm_rekey(Id1, MasterKey1, root_url(C))
+    ),
     _ = ?assertEqual(ok, kds_keyring_client:start_rekey(2, root_url(C))),
     _ = ?assertEqual(ok, kds_keyring_client:cancel_rekey(root_url(C))),
     _ = ?assertEqual(ok, kds_keyring_client:start_rekey(2, root_url(C))),
-    [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(
         {more_keys_needed, 1},
         kds_keyring_client:confirm_rekey(Id1, MasterKey1, root_url(C))
@@ -422,7 +434,15 @@ validate_rekey([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
 
 rotate(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
+    _ = ?assertEqual(
+        {error, {invalid_activity, {rotation, uninitialized}}},
+        kds_keyring_client:confirm_rotate(Id1, MasterKey1, root_url(C))
+    ),
     _ = ?assertEqual(ok, kds_keyring_client:start_rotate(root_url(C))),
+    _ = ?assertEqual(
+        {error, {invalid_activity, {rotation, confirmation}}},
+        kds_keyring_client:start_rotate(root_url(C))
+    ),
     _ = ?assertEqual({more_keys_needed, 1}, kds_keyring_client:confirm_rotate(Id1, MasterKey1, root_url(C))),
     _ = ?assertEqual(ok, kds_keyring_client:confirm_rotate(Id2, MasterKey2, root_url(C))).
 
@@ -723,7 +743,7 @@ config(Key, Config, Default) ->
     end.
 
 root_url(C) ->
-    config(root_url, C).
+    config(management_root_url, C).
 
 enc_private_keys(C) ->
     config(enc_private_keys, C).

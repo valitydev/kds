@@ -17,38 +17,66 @@
 -export_type([key/0]).
 -export_type([key_id/0]).
 -export_type([keyring/0]).
+-export_type([keyring_data/0]).
 -export_type([encrypted_keyring/0]).
 
 -type masterkey() :: kds_keysharing:masterkey().
 -type key() :: binary().
 -type key_id() :: byte().
--type encrypted_keyring() :: binary().
+-type encrypted_keyring() :: #{
+    data := binary(),
+    meta := keyring_meta() | undefined
+}.
+-type keyring_meta() :: kds_keyring_meta:keyring_meta().
 
 -type keyring() :: #{
-    current_key := key_id(),
+    data := keyring_data(),
+    meta := keyring_meta()
+}.
+
+-type keyring_data() :: #{
     keys := #{key_id() => key()}
 }.
 
 -define(KEY_BYTESIZE, 32).
+-define(FORMAT_VERSION, 1).
 
 %%
 
 -spec new() -> keyring().
 new() ->
-    #{current_key => 0, keys => #{0 => kds_crypto:key()}}.
+    #{
+        data => #{
+            keys => #{0 => kds_crypto:key()}
+        },
+        meta => #{
+            current_key_id => 0,
+            version => 1,
+            keys => #{
+                0 => #{
+                    retired => false
+                }
+            }
+        }
+    }.
 
 -spec rotate(keyring()) -> keyring().
-rotate(#{current_key := CurrentKeyId, keys := Keys}) ->
-    <<NewCurrentKeyId>> = <<(CurrentKeyId + 1)>>,
-    case maps:is_key(NewCurrentKeyId, Keys) of
-        false ->
-            #{current_key => NewCurrentKeyId, keys => Keys#{NewCurrentKeyId => kds_crypto:key()}};
-        true ->
-            throw(keyring_full)
-    end.
+rotate(#{data := #{keys := Keys}, meta := #{current_key_id := CurrentKeyId, version := Version, keys := KeysMeta}}) ->
+    MaxKeyId = lists:max(maps:keys(Keys)),
+    NewMaxKeyId = MaxKeyId + 1,
+    #{
+        data => #{
+            keys => Keys#{NewMaxKeyId => kds_crypto:key()}
+        },
+        meta => #{
+            current_key_id => CurrentKeyId,
+            version => Version + 1,
+            keys => KeysMeta#{NewMaxKeyId => #{retired => false}}
+        }
+    }.
 
 -spec get_key(key_id(), keyring()) -> {ok, {key_id(), key()}} | {error, not_found}.
-get_key(KeyId, #{keys := Keys}) ->
+get_key(KeyId, #{data := #{keys := Keys}}) ->
     case maps:find(KeyId, Keys) of
         {ok, Key} ->
             {ok, {KeyId, Key}};
@@ -57,38 +85,58 @@ get_key(KeyId, #{keys := Keys}) ->
     end.
 
 -spec get_keys(keyring()) -> [{key_id(), key()}].
-get_keys(#{keys := Keys}) ->
+get_keys(#{data := #{keys := Keys}}) ->
     maps:to_list(Keys).
 
 -spec get_current_key(keyring()) -> {key_id(), key()}.
-get_current_key(#{current_key := CurrentKeyId, keys := Keys}) ->
+get_current_key(#{data := #{keys := Keys}, meta := #{current_key_id := CurrentKeyId}}) ->
     CurrentKey = maps:get(CurrentKeyId, Keys),
     {CurrentKeyId, CurrentKey}.
 
 %%
 
 -spec encrypt(key(), keyring()) -> encrypted_keyring().
-encrypt(MasterKey, Keyring) ->
-    kds_crypto:encrypt(MasterKey, marshall(Keyring)).
+encrypt(MasterKey, #{data := KeyringData, meta := KeyringMeta}) ->
+    #{
+        data => base64:encode(kds_crypto:encrypt(MasterKey, marshall(KeyringData))),
+        meta => KeyringMeta
+    }.
 
 -spec decrypt(key(), encrypted_keyring()) -> {ok, keyring()} | {error, decryption_failed}.
-decrypt(MasterKey, EncryptedKeyring) ->
-    try {ok, unmarshall(kds_crypto:decrypt(MasterKey, EncryptedKeyring))} catch
+decrypt(MasterKey, #{data := EncryptedKeyringData, meta := KeyringMeta}) ->
+    try unmarshall(kds_crypto:decrypt(MasterKey, base64:decode(EncryptedKeyringData))) of
+        KeyringData ->
+            case KeyringMeta of
+                undefined ->
+                    {ok, #{
+                        data => KeyringData,
+                        meta => kds_keyring_meta:get_default_keyring_meta(KeyringData)
+                    }};
+                _ ->
+                    {ok, #{data => KeyringData, meta => KeyringMeta}}
+            end
+    catch
         decryption_failed ->
             {error, decryption_failed}
     end.
 
--spec marshall(keyring()) -> binary().
-marshall(#{current_key := CurrentKey, keys := Keys}) ->
-    <<CurrentKey, (maps:fold(fun marshall_keys/3, <<>>, Keys))/binary>>.
+-spec marshall(keyring_data()) -> binary().
+marshall(#{keys := Keys}) ->
+    Keyring = erlang:term_to_binary(#{
+        keys => Keys
+    }),
+    <<?FORMAT_VERSION:8/integer-unit:4, Keyring/binary>>.
 
--spec unmarshall(binary()) -> keyring().
-unmarshall(<<CurrentKey, Keys/binary>>) ->
-    #{current_key => CurrentKey, keys => unmarshall_keys(Keys, #{})}.
-
--spec marshall_keys(key_id(), key(), binary()) -> binary().
-marshall_keys(KeyId, Key, Acc) ->
-    <<Acc/binary, KeyId, Key:?KEY_BYTESIZE/binary>>.
+-spec unmarshall(binary()) -> keyring_data().
+unmarshall(<<MaxKeyId, Keys/binary>> = MarshalledKeyring) ->
+    KeysSize = erlang:byte_size(Keys),
+    case (KeysSize div 33 =:= MaxKeyId) and (KeysSize rem 33 =:= 0) of
+        true ->
+            #{keys => unmarshall_keys(Keys, #{})};
+        false ->
+            <<1:8/integer-unit:4, Keyring/binary>> = MarshalledKeyring,
+            erlang:binary_to_term(Keyring, [safe])
+    end.
 
 -spec unmarshall_keys(binary(), map()) -> map().
 unmarshall_keys(<<>>, Acc) ->

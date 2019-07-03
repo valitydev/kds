@@ -26,20 +26,35 @@
 -spec start_clear(config()) -> config().
 start_clear(Config) ->
     IP = "127.0.0.1",
-    Port = 8022,
-    RootUrl = "http://" ++ IP ++ ":" ++ integer_to_list(Port),
+    ManagementPort = 8022,
+    StoragePort = 8023,
+    ManagementRootUrl = "http://" ++ IP ++ ":" ++ integer_to_list(ManagementPort),
+    StorageRootUrl = "https://" ++ IP ++ ":" ++ integer_to_list(StoragePort),
+    CACertFile = filename:join(config(data_dir, Config), "ca.crt"),
+    ServerCertFile = filename:join(config(data_dir, Config), "server.pem"),
+    ClientCertFile = filename:join(config(data_dir, Config), "client.pem"),
     Apps =
         genlib_app:start_application_with(scoper, [
             {storage, scoper_storage_logger}
         ]) ++
         genlib_app:start_application_with(kds, [
             {ip, IP},
-            {port, Port},
+            {management_port, ManagementPort},
+            {storage_port, StoragePort},
             {keyring_storage, kds_keyring_storage_file},
             {keyring_storage_opts, #{
                 keyring_path => filename:join(config(priv_dir, Config), "keyring")
             }},
-            {transport_opts, #{}},
+            {management_transport_opts, #{}},
+            {storage_transport_opts, #{
+                transport   => ranch_ssl,
+                socket_opts => [
+                    {cacertfile,           CACertFile},
+                    {certfile,             ServerCertFile},
+                    {verify,               verify_peer},
+                    {fail_if_no_peer_cert, true}
+                ]
+            }},
             {protocol_opts, #{
                 request_timeout => 60000
             }},
@@ -107,7 +122,10 @@ start_clear(Config) ->
         ]),
     [
         {apps, lists:reverse(Apps)},
-        {root_url, genlib:to_binary(RootUrl)}
+        {management_root_url, genlib:to_binary(ManagementRootUrl)},
+        {storage_root_url, genlib:to_binary(StorageRootUrl)},
+        {cacertfile, CACertFile},
+        {clientcertfile, ClientCertFile}
     ] ++ Config.
 
 -spec stop_clear(config()) -> ok.

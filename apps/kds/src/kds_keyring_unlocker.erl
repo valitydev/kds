@@ -10,8 +10,8 @@
 -export([init/1, callback_mode/0]).
 
 -export([start_link/0]).
--export([initialize/1]).
--export([confirm/2]).
+-export([initialize/0]).
+-export([confirm/3]).
 -export([get_status/0]).
 -export([cancel/0]).
 -export([handle_event/4]).
@@ -19,9 +19,8 @@
 -export_type([state/0]).
 
 -record(data, {
-    locked_keyring,
-    shares = #{},
-    timer
+    shares = #{} :: #{kds_keysharing:share_id() => {shareholder_id(), masterkey_share()}},
+    timer :: reference() | undefined
 }).
 
 -type data() :: #data{}.
@@ -37,14 +36,14 @@
 -type shareholder_id() :: kds_shareholder:shareholder_id().
 -type masterkey_share() :: kds_keysharing:masterkey_share().
 -type masterkey_shares() :: kds_keysharing:masterkey_shares().
--type keyring() :: kds_keyring:keyring().
 -type locked_keyring() :: kds_keyring:encrypted_keyring().
+-type keyring() :: kds_keyring:keyring().
 -type unlock_errors() ::
     wrong_masterkey | failed_to_recover.
 -type invalid_activity() :: {error, {invalid_activity, {unlock, state()}}}.
 -type unlock_resp() ::
     {ok, {done, keyring()}} |
-    {ok, {more, non_neg_integer()}}|
+    {ok, {more, pos_integer()}} |
     {error, {operation_aborted, unlock_errors()}}.
 
 -spec callback_mode() -> handle_event_function.
@@ -56,15 +55,15 @@ callback_mode() -> handle_event_function.
 start_link() ->
     gen_statem:start_link({local, ?STATEM}, ?MODULE, [], []).
 
--spec initialize(locked_keyring()) -> ok | invalid_activity().
+-spec initialize() -> ok | invalid_activity().
 
-initialize(LockedKeyring) ->
-    call({initialize, LockedKeyring}).
+initialize() ->
+    call(initialize).
 
--spec confirm(shareholder_id(), masterkey_share()) -> unlock_resp() | invalid_activity().
+-spec confirm(shareholder_id(), masterkey_share(), locked_keyring()) -> unlock_resp() | invalid_activity().
 
-confirm(ShareholderId, Share) ->
-    call({confirm, ShareholderId, Share}).
+confirm(ShareholderId, Share, LockedKeyring) ->
+    call({confirm, ShareholderId, Share, LockedKeyring}).
 
 -spec cancel() -> ok.
 
@@ -89,15 +88,15 @@ init([]) ->
 
 %% Successful workflow events
 
-handle_event({call, From}, {initialize, LockedKeyring}, uninitialized, _Data) ->
+handle_event({call, From}, initialize, uninitialized, _Data) ->
     TimerRef = erlang:start_timer(get_timeout(), self(), lifetime_expired),
     {next_state,
         validation,
-        #data{locked_keyring = LockedKeyring, timer = TimerRef},
+        #data{timer = TimerRef},
         {reply, From, ok}};
 
-handle_event({call, From}, {confirm, ShareholderId, Share}, validation,
-    #data{locked_keyring = LockedKeyring, shares = Shares, timer = TimerRef} = StateData) ->
+handle_event({call, From}, {confirm, ShareholderId, Share, LockedKeyring}, validation,
+    #data{shares = Shares, timer = TimerRef} = StateData) ->
     #share{threshold = Threshold, x = X} = kds_keysharing:decode_share(Share),
     case Shares#{X => {ShareholderId, Share}} of
         AllShares when map_size(AllShares) =:= Threshold ->
@@ -127,7 +126,7 @@ handle_event({call, From}, get_status, State, #data{timer = TimerRef, shares = V
     },
     {keep_state_and_data, {reply, From, Status}};
 handle_event({call, From}, cancel, _State, #data{timer = TimerRef}) ->
-    _ = erlang:cancel_timer(TimerRef),
+    ok = cancel_timer(TimerRef),
     {next_state, uninitialized, #data{}, {reply, From, ok}};
 handle_event(info, {timeout, _TimerRef, lifetime_expired}, _State, _Data) ->
     {next_state, uninitialized, #data{}, []};
@@ -173,3 +172,9 @@ unlock(LockedKeyring, AllShares) ->
         {error, Error} ->
             {error, {operation_aborted, Error}}
     end.
+
+cancel_timer(undefined) ->
+    ok;
+cancel_timer(TimerRef) ->
+    _ = erlang:cancel_timer(TimerRef),
+    ok.

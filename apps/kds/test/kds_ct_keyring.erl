@@ -109,7 +109,7 @@ config(Key, Config, Default) ->
     end.
 
 root_url(C) ->
-    config(root_url, C).
+    config(management_root_url, C).
 
 enc_private_keys(C) ->
     config(enc_private_keys, C).

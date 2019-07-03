@@ -1,9 +1,9 @@
 -module(kds_keyring_storage).
 
 -callback child_spec(map()) -> {ok, supervisor:child_spec()}.
--callback create(binary()) -> ok | {error, already_exists}.
--callback read() -> {ok, binary()} | {error, not_found}.
--callback update(binary()) -> ok.
+-callback create(kds_keyring:encrypted_keyring()) -> ok | {error, already_exists}.
+-callback read() -> {ok, kds_keyring:encrypted_keyring()} | {error, not_found}.
+-callback update(kds_keyring:encrypted_keyring()) -> ok.
 -callback delete() -> ok.
 
 -export([child_spec/1]).
@@ -16,15 +16,15 @@
 child_spec(StorageOpts) ->
     kds_backend:call(keyring_storage, child_spec, [StorageOpts]).
 
--spec create(binary()) -> ok.
+-spec create(kds_keyring:encrypted_keyring()) -> ok.
 create(Keyring) ->
     kds_backend:call(keyring_storage, create, [Keyring]).
 
--spec read() -> binary().
+-spec read() -> kds_keyring:encrypted_keyring().
 read() ->
     kds_backend:call(keyring_storage, read, []).
 
--spec update(binary()) -> ok.
+-spec update(kds_keyring:encrypted_keyring()) -> ok.
 update(Keyring) ->
     kds_backend:call(keyring_storage, update, [Keyring]).
 

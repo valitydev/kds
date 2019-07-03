@@ -7,10 +7,10 @@
 %% API
 -export([init/1, callback_mode/0]).
 -export([start_link/0]).
--export([initialize/2]).
--export([confirm/2]).
--export([start_validation/0]).
--export([validate/2]).
+-export([initialize/1]).
+-export([confirm/3]).
+-export([start_validation/1]).
+-export([validate/3]).
 -export([get_status/0]).
 -export([cancel/0]).
 -export([handle_event/4]).
@@ -22,8 +22,7 @@
 
 -record(data, {
     threshold,
-    encrypted_keyring,
-    keyring,
+    validation_keyring,
     shareholders,
     confirmation_shares = #{},
     validation_shares = #{},
@@ -45,6 +44,7 @@
 }.
 
 -type encrypted_keyring() :: kds_keyring:encrypted_keyring().
+-type keyring() :: kds_keyring:keyring().
 
 -type state() :: uninitialized | validation.
 
@@ -66,30 +66,30 @@ callback_mode() -> handle_event_function.
 start_link() ->
     gen_statem:start_link({local, ?STATEM}, ?MODULE, [], []).
 
--spec initialize(threshold(), encrypted_keyring()) ->
+-spec initialize(threshold()) ->
     ok | {error, initialize_errors() | invalid_activity_errors()}.
 
-initialize(Threshold, EncryptedKeyring) ->
-    call({initialize, Threshold, EncryptedKeyring}).
+initialize(Threshold) ->
+    call({initialize, Threshold}).
 
--spec confirm(shareholder_id(), masterkey_share()) ->
-    {ok, {more, integer()}} | ok | {error, confirm_errors() | invalid_activity_errors()}.
+-spec confirm(shareholder_id(), masterkey_share(), encrypted_keyring()) ->
+    {ok, {more, pos_integer()}} | ok | {error, confirm_errors() | invalid_activity_errors()}.
 
-confirm(ShareholderId, Share) ->
-    call({confirm, ShareholderId, Share}).
+confirm(ShareholderId, Share, EncryptedKeyring) ->
+    call({confirm, ShareholderId, Share, EncryptedKeyring}).
 
--spec start_validation() -> {ok, encrypted_master_key_shares()} | {error, invalid_activity_errors()}.
+-spec start_validation(keyring()) -> {ok, encrypted_master_key_shares()} | {error, invalid_activity_errors()}.
 
-start_validation() ->
-    call(start_validatation).
+start_validation(Keyring) ->
+    call({start_validatation, Keyring}).
 
--spec validate(shareholder_id(), masterkey_share()) ->
-    {ok, {more, integer()}} |
+-spec validate(shareholder_id(), masterkey_share(), keyring()) ->
+    {ok, {more, pos_integer()}} |
     {ok, {done, encrypted_keyring()}} |
     {error, validate_errors() | invalid_activity_errors()}.
 
-validate(ShareholderId, Share) ->
-    call({validate, ShareholderId, Share}).
+validate(ShareholderId, Share, Keyring) ->
+    call({validate, ShareholderId, Share, Keyring}).
 
 -spec cancel() -> ok.
 
@@ -114,14 +114,13 @@ init([]) ->
 
 %% Successful workflow events
 
-handle_event({call, From}, {initialize, Threshold, EncryptedKeyring}, uninitialized, Data) ->
+handle_event({call, From}, {initialize, Threshold}, uninitialized, Data) ->
     Shareholders = kds_shareholder:get_all(),
     ShareholdersLength = length(Shareholders),
     case (Threshold >= 1) and (ShareholdersLength >= 1) and (Threshold =< ShareholdersLength) of
         true ->
             TimerRef = erlang:start_timer(get_timeout(), self(), lifetime_expired),
             NewData = Data#data{
-                encrypted_keyring = EncryptedKeyring,
                 threshold = Threshold,
                 shareholders = Shareholders,
                 timer = TimerRef},
@@ -135,15 +134,15 @@ handle_event({call, From}, {initialize, Threshold, EncryptedKeyring}, uninitiali
                 #data{},
                 {reply, From, {error, invalid_args}}}
     end;
-handle_event({call, From}, {confirm, ShareholderId, Share}, confirmation,
-    #data{confirmation_shares = Shares, encrypted_keyring = EncryptedKeyring, timer = TimerRef} = Data) ->
+handle_event({call, From}, {confirm, ShareholderId, Share, EncryptedKeyring}, confirmation,
+    #data{confirmation_shares = Shares, timer = TimerRef} = Data) ->
     #share{x = X, threshold = Threshold} = kds_keysharing:decode_share(Share),
     case Shares#{X => {ShareholderId, Share}} of
         AllShares when map_size(AllShares) =:= Threshold ->
             ListShares = kds_keysharing:get_shares(AllShares),
             case confirm_operation(EncryptedKeyring, ListShares) of
-                {ok, Keyring} ->
-                    NewData = Data#data{confirmation_shares = AllShares, keyring = Keyring},
+                ok ->
+                    NewData = Data#data{confirmation_shares = AllShares},
                     {next_state,
                         postconfirmation,
                         NewData,
@@ -162,23 +161,23 @@ handle_event({call, From}, {confirm, ShareholderId, Share}, confirmation,
                 NewData,
                 {reply, From, {ok, {more, Threshold - maps:size(Shares1)}}}}
     end;
-handle_event({call, From}, start_validatation, postconfirmation,
-    #data{shareholders = Shareholders, threshold = Threshold, keyring = Keyring} = Data) ->
+handle_event({call, From}, {start_validatation, Keyring}, postconfirmation,
+    #data{shareholders = Shareholders, threshold = Threshold} = Data) ->
     MasterKey = kds_crypto:key(),
     EncryptedKeyring = kds_keyring:encrypt(MasterKey, Keyring),
     Shares = kds_keysharing:share(MasterKey, Threshold, length(Shareholders)),
     EncryptedShares = kds_keysharing:encrypt_shares_for_shareholders(Shares, Shareholders),
-    NewData = Data#data{encrypted_keyring = EncryptedKeyring, keyring = undefined},
+    NewData = Data#data{validation_keyring = EncryptedKeyring},
     {next_state,
         validation,
         NewData,
         {reply, From, {ok, EncryptedShares}}};
-handle_event({call, From}, {validate, ShareholderId, Share}, validation,
+handle_event({call, From}, {validate, ShareholderId, Share, Keyring}, validation,
     #data{
         shareholders = Shareholders,
         threshold = Threshold,
         validation_shares = Shares,
-        encrypted_keyring = EncryptedKeyring,
+        validation_keyring = ValidationKeyring,
         timer = TimerRef} = Data) ->
     #share{x = X} = kds_keysharing:decode_share(Share),
     ShareholdersCount = length(Shareholders),
@@ -186,7 +185,7 @@ handle_event({call, From}, {validate, ShareholderId, Share}, validation,
         AllShares when map_size(AllShares) =:= ShareholdersCount ->
             _Time = erlang:cancel_timer(TimerRef),
             ListShares = kds_keysharing:get_shares(AllShares),
-            Result = validate_operation(Threshold, ListShares, EncryptedKeyring),
+            Result = validate_operation(Threshold, ListShares, ValidationKeyring, Keyring),
             {next_state,
                 uninitialized,
                 #data{},
@@ -218,7 +217,7 @@ handle_event({call, From}, get_status, State,
     },
     {keep_state_and_data, {reply, From, Status}};
 handle_event({call, From}, cancel, _State, #data{timer = TimerRef}) ->
-    _ = erlang:cancel_timer(TimerRef),
+    ok = cancel_timer(TimerRef),
     {next_state, uninitialized, #data{}, {reply, From, ok}};
 handle_event(info, {timeout, _TimerRef, lifetime_expired}, _State, _Data) ->
     {next_state, uninitialized, #data{}, []};
@@ -257,15 +256,14 @@ get_lifetime(TimerRef) ->
             erlang:read_timer(TimerRef) div 1000
     end.
 
--spec confirm_operation(encrypted_keyring(), masterkey_shares()) ->
-    {ok, kds_keyring:keyring()} | {error, confirm_errors()}.
+-spec confirm_operation(encrypted_keyring(), masterkey_shares()) -> ok | {error, confirm_errors()}.
 
 confirm_operation(EncryptedOldKeyring, AllShares) ->
     case kds_keysharing:recover(AllShares) of
         {ok, MasterKey} ->
             case kds_keyring:validate_masterkey(MasterKey, EncryptedOldKeyring) of
-                {ok, Keyring} ->
-                    {ok, Keyring};
+                {ok, _Keyring} ->
+                    ok;
                 {error, wrong_masterkey} ->
                     {error, {operation_aborted, wrong_masterkey}}
             end;
@@ -273,14 +271,15 @@ confirm_operation(EncryptedOldKeyring, AllShares) ->
             {error, {operation_aborted, failed_to_recover}}
     end.
 
--spec validate_operation(threshold(), masterkey_shares(), encrypted_keyring()) ->
+-spec validate_operation(threshold(), masterkey_shares(), encrypted_keyring(), keyring()) ->
     {ok, {done, encrypted_keyring()}} | {error, validate_errors()}.
 
-validate_operation(Threshold, Shares, EncryptedKeyring) ->
+validate_operation(Threshold, Shares, ValidationKeyring, Keyring) ->
     case kds_keysharing:validate_shares(Threshold, Shares) of
         {ok, MasterKey} ->
-            case kds_keyring:decrypt(MasterKey, EncryptedKeyring) of
+            case kds_keyring:decrypt(MasterKey, ValidationKeyring) of
                 {ok, _DecryptedKeyring} ->
+                    EncryptedKeyring = kds_keyring:encrypt(MasterKey, Keyring),
                     {ok, {done, EncryptedKeyring}};
                 {error, decryption_failed} ->
                     {error, {operation_aborted, failed_to_decrypt_keyring}}
@@ -288,3 +287,9 @@ validate_operation(Threshold, Shares, EncryptedKeyring) ->
         {error, Error} ->
             {error, {operation_aborted, Error}}
     end.
+
+cancel_timer(undefined) ->
+    ok;
+cancel_timer(TimerRef) ->
+    _ = erlang:cancel_timer(TimerRef),
+    ok.

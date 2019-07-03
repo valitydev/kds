@@ -145,10 +145,10 @@ $ woorl -s cds_proto/proto/keyring.thrift \
    Keyring StartUnlock
 ```
 
-### Валидация
+### Подтверждение
 
 `Threshold` владельцев фрагментов ключа расшифровывают свою часть, подписывают и отдают
- на валидацию:
+ на подтверждение:
  
 ```bash
 $ echo "<insert EncryptedMasterKeyShare here>" | \
@@ -156,7 +156,7 @@ $ echo "<insert EncryptedMasterKeyShare here>" | \
   step crypto jws sign - --key ec.json | \
   woorl -s cds_proto/proto/keyring.thrift \
    'http://kds:8022/v2/keyring' \
-   Keyring ValidateUnlock '"<insert id, ex. ndiezel>"' '"'"$(cat -)"'"'
+   Keyring ConfirmUnlock '"<insert id, ex. ndiezel>"' '"'"$(cat -)"'"'
 ```
 
 `EncodedMasterKeyShare` - полученный зашифрованный фрагмент мастер-ключа
@@ -189,10 +189,10 @@ $ woorl -s cds_proto/proto/keyring.thrift \
    Keyring StartRotate
 ```
 
-### Валидация
+### Подтверждение
 
 `Threshold` владельцев фрагментов ключа расшифровывают свою часть, подписывают и отдают
- на валидацию:
+ на подтверждение:
  
 ```bash
 $ echo "<insert EncryptedMasterKeyShare here>" | \
@@ -200,7 +200,7 @@ $ echo "<insert EncryptedMasterKeyShare here>" | \
   step crypto jws sign - --key ec.json | \
   woorl -s cds_proto/proto/kds.thrift \
    'http://kds:8022/v2/keyring' \
-   Keyring ValidateRotate '"<insert id, ex. ndiezel>"' '"'"$(cat -)"'"'
+   Keyring ConfirmRotate '"<insert id, ex. ndiezel>"' '"'"$(cat -)"'"'
 ```
 
 `EncodedMasterKeyShare` - полученный зашифрованный фрагмент мастер-ключа

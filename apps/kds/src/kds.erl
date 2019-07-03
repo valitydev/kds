@@ -35,19 +35,34 @@ stop() ->
 init([]) ->
     {ok, IP} = inet:parse_address(application:get_env(kds, ip, "::")),
     HealthCheckers = genlib_app:env(?MODULE, health_checkers, []),
-    Service = woody_server:child_spec(
-        kds_thrift_service_sup,
+    KeyringManagementService = woody_server:child_spec(
+        kds_thrift_management_service_sup,
         #{
             handlers => [
-                kds_thrift_services:http_handler(keyring_v2)
+                kds_thrift_services:http_handler(keyring_management)
             ],
             event_handler     => scoper_woody_event_handler,
             ip                => IP,
-            port              => genlib_app:env(?MODULE, port, 8022),
-            transport_opts    => genlib_app:env(?MODULE, transport_opts, #{}),
+            port              => genlib_app:env(?MODULE, management_port, 8022),
+            transport_opts    => genlib_app:env(?MODULE, management_transport_opts, #{}),
             protocol_opts     => genlib_app:env(?MODULE, protocol_opts, #{}),
             shutdown_timeout  => genlib_app:env(?MODULE, shutdown_timeout, 0),
             additional_routes => [erl_health_handle:get_route(HealthCheckers)]
+        }
+    ),
+    KeyringStorageService = woody_server:child_spec(
+        kds_thrift_storage_service_sup,
+        #{
+            handlers => [
+                kds_thrift_services:http_handler(keyring_storage)
+            ],
+            event_handler     => scoper_woody_event_handler,
+            ip                => IP,
+            port              => genlib_app:env(?MODULE, storage_port, 8023),
+            transport_opts    => genlib_app:env(?MODULE, storage_transport_opts, #{}),
+            protocol_opts     => genlib_app:env(?MODULE, protocol_opts, #{}),
+            shutdown_timeout  => genlib_app:env(?MODULE, shutdown_timeout, 0),
+            additional_routes => []
         }
     ),
     KeyringSupervisor = #{
@@ -60,7 +75,8 @@ init([]) ->
     Procs = [
         KeyringStorage,
         KeyringSupervisor,
-        Service
+        KeyringManagementService,
+        KeyringStorageService
     ],
     {ok, {{one_for_one, 1, 5}, Procs}}.
 
