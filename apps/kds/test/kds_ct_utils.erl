@@ -55,6 +55,13 @@ start_clear(Config) ->
                     {fail_if_no_peer_cert, true}
                 ]
             }},
+            {new_key_security_parameters, #{
+                deduplication_hash_opts => #{
+                    n => 16384,
+                    r => 8,
+                    p => 1
+                }
+            }},
             {protocol_opts, #{
                 request_timeout => 60000
             }},

@@ -40,11 +40,19 @@
 
 -define(KEY_BYTESIZE, 32).
 -define(FORMAT_VERSION, 1).
+-define(DEFAULT_SEC_PARAMS, #{
+    deduplication_hash_opts => #{
+        n => 16384,
+        r => 8,
+        p => 1
+    }
+}).
 
 %%
 
 -spec new() -> keyring().
 new() ->
+    SecurityParameters = application:get_env(kds, new_key_security_parameters, ?DEFAULT_SEC_PARAMS),
     #{
         data => #{
             keys => #{0 => kds_crypto:key()}
@@ -54,7 +62,8 @@ new() ->
             version => 1,
             keys => #{
                 0 => #{
-                    retired => false
+                    retired => false,
+                    security_parameters => SecurityParameters
                 }
             }
         }
@@ -63,6 +72,7 @@ new() ->
 -spec rotate(keyring()) -> keyring().
 rotate(#{data := #{keys := Keys}, meta := #{current_key_id := CurrentKeyId, version := Version, keys := KeysMeta}}) ->
     MaxKeyId = lists:max(maps:keys(Keys)),
+    SecurityParameters = application:get_env(kds, new_key_security_parameters, ?DEFAULT_SEC_PARAMS),
     NewMaxKeyId = MaxKeyId + 1,
     #{
         data => #{
@@ -71,7 +81,7 @@ rotate(#{data := #{keys := Keys}, meta := #{current_key_id := CurrentKeyId, vers
         meta => #{
             current_key_id => CurrentKeyId,
             version => Version + 1,
-            keys => KeysMeta#{NewMaxKeyId => #{retired => false}}
+            keys => KeysMeta#{NewMaxKeyId => #{retired => false, security_parameters => SecurityParameters}}
         }
     }.
 

@@ -7,8 +7,10 @@
 -export([update_meta/2]).
 -export([decode_keyring_meta_diff/1]).
 -export([decode_keyring_meta/1]).
+-export([decode_security_parameters/1]).
 -export([encode_keyring_meta_diff/1]).
 -export([encode_keyring_meta/1]).
+-export([encode_security_parameters/1]).
 
 -export_type([keyring_meta/0]).
 -export_type([keyring_meta_diff/0]).
@@ -23,21 +25,33 @@
 -type keyring_meta_diff() :: #{
     current_key_id => non_neg_integer() | undefined,
     keys => #{
-        key_id() => key_meta()
+        key_id() => key_meta_diff()
     } | undefined
 }.
 -type key_meta() :: #{
+    retired := boolean(),
+    security_parameters := security_parameters()
+}.
+-type key_meta_diff() :: #{
     retired := boolean()
+}.
+-type security_parameters() :: #{
+    deduplication_hash_opts := #{
+        n := pos_integer(),
+        r := pos_integer(),
+        p := pos_integer()
+    }
 }.
 -type key_id() :: kds_keyring:key_id().
 -type encoded_keyring_meta() :: #'KeyringMeta'{}.
 -type encoded_keyring_meta_diff() :: #'KeyringMetaDiff'{}.
+-type encoded_security_parameters() :: #'SecurityParameters'{}.
 
 -spec get_default_keyring_meta(kds_keyring:keyring_data()) -> keyring_meta().
 get_default_keyring_meta(KeyringData) ->
     Keys = maps:get(keys, KeyringData),
     CurrentKeyId = lists:max(maps:keys(Keys)),
-    KeysMeta = maps:map(fun (_KeyId, _Key) -> #{retired => false} end, Keys),
+    KeysMeta = maps:map(fun(_KeyId, _Key) -> #{retired => false} end, Keys),
     #{current_key_id => CurrentKeyId, version => 1, keys => KeysMeta}.
 
 -spec update_meta(keyring_meta(), keyring_meta_diff()) -> keyring_meta().
@@ -73,7 +87,7 @@ decode_keyring_meta_diff(#'KeyringMetaDiff'{
     current_key_id = CurrentKeyId,
     keys_meta = KeysMeta
 }) ->
-    DecodedKeysMeta = decode_keys_meta(KeysMeta),
+    DecodedKeysMeta = decode_keys_meta_diff(KeysMeta),
     #{current_key_id => CurrentKeyId, keys => DecodedKeysMeta}.
 
 -spec decode_keyring_meta(encoded_keyring_meta()) -> keyring_meta().
@@ -84,21 +98,44 @@ decode_keyring_meta(#'KeyringMeta'{
     DecodedKeysMeta = decode_keys_meta(KeysMeta),
     #{current_key_id => CurrentKeyId, version => 1, keys => DecodedKeysMeta}.
 
-decode_keys_meta(undefined) ->
+decode_keys_meta_diff(undefined) ->
     undefined;
-decode_keys_meta(KeysMeta) ->
+decode_keys_meta_diff(KeysMetaDiff) ->
     maps:fold(
-        fun (K, #'KeyMeta'{retired = Retired}, Acc) ->
+        fun(K, #'KeyMetaDiff'{retired = Retired}, Acc) ->
             Acc#{K => #{retired => Retired}}
         end,
         #{},
+        KeysMetaDiff).
+
+decode_keys_meta(KeysMeta) ->
+    maps:fold(
+        fun(K,
+            #'KeyMeta'{
+                retired = Retired,
+                security_parameters = SecurityParameters
+            },
+            Acc) ->
+            Acc#{K => #{
+                retired => Retired,
+                security_parameters => decode_security_parameters(SecurityParameters)
+            }}
+        end,
+        #{},
         KeysMeta).
+
+-spec decode_security_parameters(encoded_security_parameters()) -> security_parameters().
+decode_security_parameters(#'SecurityParameters'{deduplication_hash_opts = HashOpts}) ->
+    #{deduplication_hash_opts => decode_scrypt_opts(HashOpts)}.
+
+decode_scrypt_opts(#'ScryptOptions'{n = N, r = R, p = P}) ->
+    #{n => N, r => R, p => P}.
 
 -spec encode_keyring_meta_diff(keyring_meta_diff()) -> encoded_keyring_meta_diff().
 encode_keyring_meta_diff(KeyringMetaDiff) ->
     #'KeyringMetaDiff'{
         current_key_id = maps:get(current_key_id, KeyringMetaDiff, undefined),
-        keys_meta = encode_keys_meta(maps:get(keys, KeyringMetaDiff, undefined))
+        keys_meta = encode_keys_meta_diff(maps:get(keys, KeyringMetaDiff, undefined))
     }.
 
 -spec encode_keyring_meta(keyring_meta() | undefined) -> encoded_keyring_meta().
@@ -111,14 +148,39 @@ encode_keyring_meta(#{
     EncodedKeysMeta = encode_keys_meta(KeysMeta),
     #'KeyringMeta'{current_key_id = CurrentKeyId, keys_meta = EncodedKeysMeta}.
 
+encode_keys_meta_diff(undefined) ->
+    undefined;
+encode_keys_meta_diff(KeysMetaDiff) ->
+    maps:fold(
+        fun(K, #{retired := Retired}, Acc) ->
+            Acc#{K => #'KeyMetaDiff'{retired = Retired}}
+        end,
+        #{},
+        KeysMetaDiff
+    ).
 
 encode_keys_meta(undefined) ->
     undefined;
 encode_keys_meta(KeysMeta) ->
     maps:fold(
-        fun (K, #{retired := Retired}, Acc) ->
-            Acc#{K => #'KeyMeta'{retired = Retired}}
+        fun(K,
+            #{
+                retired := Retired,
+                security_parameters := SecurityParameters
+            },
+            Acc) ->
+            Acc#{K => #'KeyMeta'{
+                retired = Retired,
+                security_parameters = encode_security_parameters(SecurityParameters)
+            }}
         end,
         #{},
         KeysMeta
     ).
+
+-spec encode_security_parameters(security_parameters()) -> encoded_security_parameters().
+encode_security_parameters(#{deduplication_hash_opts := ScryptOpts}) ->
+    #'SecurityParameters'{deduplication_hash_opts = encode_scrypt_opts(ScryptOpts)}.
+
+encode_scrypt_opts(#{n := N, r := R, p := P}) ->
+    #'ScryptOptions'{n = N, r = R, p = P}.

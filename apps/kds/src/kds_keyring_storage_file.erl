@@ -128,10 +128,28 @@ decode_encrypted_keyring(#{
 
 decode_number_key_map(Map) ->
     maps:fold(
-        fun (K, #{<<"retired">> := Retired}, Acc) ->
+        fun (K,
+            #{
+                <<"retired">> := Retired,
+                <<"security_parameters">> := #{
+                    <<"deduplication_hash_opts">> := #{
+                        <<"n">> := ScryptN,
+                        <<"r">> := ScryptR,
+                        <<"p">> := ScryptP
+                    }
+                }
+            },
+            Acc) ->
             Acc#{
                 binary_to_integer(K) => #{
-                    retired => Retired
+                    retired => Retired,
+                    security_parameters => #{
+                        deduplication_hash_opts => #{
+                            n => ScryptN,
+                            r => ScryptR,
+                            p => ScryptP
+                        }
+                    }
                 }
             }
         end,

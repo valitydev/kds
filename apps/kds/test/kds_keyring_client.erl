@@ -412,8 +412,16 @@ decode_keys(Keys) ->
 
 decode_keys_meta(Keys) ->
     maps:fold(
-        fun (K, #'Key'{meta = #'KeyMeta'{retired = Retired}}, Acc) ->
-            Acc#{K => #{retired => Retired}}
+        fun(K,
+            #'Key'{meta = #'KeyMeta'{
+                retired = Retired,
+                security_parameters = SecurityParameters
+            }},
+            Acc) ->
+            Acc#{K => #{
+                retired => Retired,
+                security_parametes => kds_keyring_meta:decode_security_parameters(SecurityParameters)
+            }}
         end,
         #{},
         Keys

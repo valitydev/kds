@@ -91,14 +91,50 @@ init_check_meta(C) ->
 
 rotate_check_meta(C) ->
     _ = ?assertMatch(
-        #{keys := #{0 := #{retired := false}}},
+        #{keys := #{
+            0 := #{
+                retired := false,
+                security_parameters := #{
+                    deduplication_hash_opts := #{
+                        n := 16384,
+                        r := 8,
+                        p := 1
+                    }
+                }
+            }
+        }},
         kds_keyring_client:get_keyring_meta(root_url(C))
     ),
+    ok = application:set_env(kds, new_key_security_parameters, #{
+        deduplication_hash_opts => #{
+            n => 16384,
+            r => 7,
+            p => 1
+        }
+    }),
     _ = kds_ct_keyring:rotate(C),
     _ = ?assertMatch(
         #{keys := #{
-            0 := #{retired := false},
-            1 := #{retired := false}
+            0 := #{
+                retired := false,
+                security_parameters := #{
+                    deduplication_hash_opts := #{
+                        n := 16384,
+                        r := 8,
+                        p := 1
+                    }
+                }
+            },
+            1 := #{
+                retired := false,
+                security_parameters := #{
+                    deduplication_hash_opts := #{
+                        n := 16384,
+                        r := 7,
+                        p := 1
+                    }
+                }
+            }
         }},
         kds_keyring_client:get_keyring_meta(root_url(C))
     ).
