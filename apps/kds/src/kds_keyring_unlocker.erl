@@ -35,7 +35,7 @@
 
 -type shareholder_id() :: kds_shareholder:shareholder_id().
 -type masterkey_share() :: kds_keysharing:masterkey_share().
--type masterkey_shares() :: kds_keysharing:masterkey_shares().
+-type masterkey_shares_map() :: kds_keysharing:masterkey_shares_map().
 -type locked_keyring() :: kds_keyring:encrypted_keyring().
 -type keyring() :: kds_keyring:keyring().
 -type unlock_errors() ::
@@ -90,6 +90,7 @@ init([]) ->
 
 handle_event({call, From}, initialize, uninitialized, _Data) ->
     TimerRef = erlang:start_timer(get_timeout(), self(), lifetime_expired),
+    _ = logger:info("kds_keyring_unlocker changed state to validation"),
     {next_state,
         validation,
         #data{timer = TimerRef},
@@ -101,9 +102,12 @@ handle_event({call, From}, {confirm, ShareholderId, Share, LockedKeyring}, valid
     case Shares#{X => {ShareholderId, Share}} of
         AllShares when map_size(AllShares) =:= Threshold ->
             _ = erlang:cancel_timer(TimerRef),
-            ListShares = kds_keysharing:get_shares(AllShares),
-            Result = unlock(LockedKeyring, ListShares),
-            {next_state, uninitialized, #data{}, {reply, From, Result}};
+            Result = unlock(LockedKeyring, AllShares),
+            _ = logger:info("kds_keyring_unlocker changed state to uninitialized"),
+            {next_state,
+                uninitialized,
+                #data{shares = kds_keysharing:clear_shares(Shares)},
+                {reply, From, Result}};
         More ->
             {keep_state,
                 StateData#data{shares = More},
@@ -127,8 +131,10 @@ handle_event({call, From}, get_status, State, #data{timer = TimerRef, shares = V
     {keep_state_and_data, {reply, From, Status}};
 handle_event({call, From}, cancel, _State, #data{timer = TimerRef}) ->
     ok = cancel_timer(TimerRef),
+    _ = logger:info("kds_keyring_unlocker changed state to uninitialized"),
     {next_state, uninitialized, #data{}, {reply, From, ok}};
 handle_event(info, {timeout, _TimerRef, lifetime_expired}, _State, _Data) ->
+    _ = logger:info("kds_keyring_unlocker changed state to uninitialized"),
     {next_state, uninitialized, #data{}, []};
 
 %% InvalidActivity events
@@ -157,14 +163,17 @@ get_lifetime(TimerRef) ->
             erlang:read_timer(TimerRef) div 1000
     end.
 
--spec unlock(locked_keyring(), masterkey_shares()) ->
+-spec unlock(locked_keyring(), masterkey_shares_map()) ->
     {ok, {done, keyring()}} | {error, {operation_aborted, unlock_errors()}}.
 
 unlock(LockedKeyring, AllShares) ->
-    case kds_keysharing:recover(AllShares) of
+    ListShares = kds_keysharing:get_shares(AllShares),
+    case kds_keysharing:recover(ListShares) of
         {ok, MasterKey} ->
             case kds_keyring:decrypt(MasterKey, LockedKeyring) of
                 {ok, UnlockedKeyring} ->
+                    UnlockersIds = kds_keysharing:get_shareholder_ids(AllShares),
+                    _ = logger:info("Unlock finished with shares from ~p", [UnlockersIds]),
                     {ok, {done, UnlockedKeyring}};
                 {error, decryption_failed} ->
                     {error, {operation_aborted, wrong_masterkey}}

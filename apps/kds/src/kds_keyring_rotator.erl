@@ -35,7 +35,7 @@
 
 -type shareholder_id() :: kds_shareholder:shareholder_id().
 -type masterkey_share() :: kds_keysharing:masterkey_share().
--type masterkey_shares() :: kds_keysharing:masterkey_shares().
+-type masterkey_shares() :: kds_keysharing:masterkey_shares_map().
 -type keyring() :: kds_keyring:keyring().
 -type encrypted_keyring() :: kds_keyring:encrypted_keyring().
 -type rotate_errors() ::
@@ -91,6 +91,7 @@ init([]) ->
 
 handle_event({call, From}, initialize, uninitialized, _Data) ->
     TimerRef = erlang:start_timer(get_timeout(), self(), lifetime_expired),
+    _ = logger:info("kds_keyring_rotator changed state to validation"),
     {next_state,
         validation,
         #data{timer = TimerRef}, {reply, From, ok}};
@@ -101,9 +102,12 @@ handle_event({call, From}, {confirm, ShareholderId, Share, EncryptedOldKeyring, 
     case Shares#{X => {ShareholderId, Share}} of
         AllShares when map_size(AllShares) =:= Threshold ->
             _ = erlang:cancel_timer(TimerRef),
-            ListShares = kds_keysharing:get_shares(AllShares),
-            Result = update_keyring(OldKeyring, EncryptedOldKeyring, ListShares),
-            {next_state, uninitialized, #data{}, {reply, From, Result}};
+            Result = update_keyring(OldKeyring, EncryptedOldKeyring, AllShares),
+            _ = logger:info("kds_keyring_rotator changed state to uninitialized"),
+            {next_state,
+                uninitialized,
+                #data{shares = kds_keysharing:clear_shares(Shares)},
+                {reply, From, Result}};
         More ->
             {keep_state,
                 StateData#data{shares = More},
@@ -125,8 +129,10 @@ handle_event({call, From}, get_status, State, #data{timer = TimerRef, shares = V
     {keep_state_and_data, {reply, From, Status}};
 handle_event({call, From}, cancel, _State, #data{timer = TimerRef}) ->
     ok = cancel_timer(TimerRef),
+    _ = logger:info("kds_keyring_rotator changed state to uninitialized"),
     {next_state, uninitialized, #data{}, {reply, From, ok}};
 handle_event(info, {timeout, _TimerRef, lifetime_expired}, _State, _Data) ->
+    _ = logger:info("kds_keyring_rotator changed state to uninitialized"),
     {next_state, uninitialized, #data{}, []};
 
 %% InvalidActivity events
@@ -159,12 +165,15 @@ get_lifetime(TimerRef) ->
     {ok, {done, {encrypted_keyring(), keyring()}}} | {error, {operation_aborted, rotate_errors()}}.
 
 update_keyring(OldKeyring, EncryptedOldKeyring, AllShares) ->
-    case kds_keysharing:recover(AllShares) of
+    ListShares = kds_keysharing:get_shares(AllShares),
+    case kds_keysharing:recover(ListShares) of
         {ok, MasterKey} ->
             case kds_keyring:validate_masterkey(MasterKey, OldKeyring, EncryptedOldKeyring) of
                 {ok, OldKeyring} ->
                     NewKeyring = kds_keyring:rotate(OldKeyring),
                     EncryptedNewKeyring = kds_keyring:encrypt(MasterKey, NewKeyring),
+                    ConfirmationShareholdersIds = kds_keysharing:get_shareholder_ids(AllShares),
+                    _ = logger:info("Rotation finished with shares from ~p", [ConfirmationShareholdersIds]),
                     {ok, {done, {EncryptedNewKeyring, NewKeyring}}};
                 {error, Error} ->
                     {error, {operation_aborted, Error}}

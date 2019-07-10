@@ -34,15 +34,13 @@ handle_function_('StartInit', [Threshold], _Context, _Opts) ->
             raise(#'InvalidArguments'{})
     end;
 handle_function_('ValidateInit', [ShareholderId, Share], _Context, _Opts) ->
-    VerifiedShare = verify_signed_share(ShareholderId, Share),
+    VerifiedShare = verify_signed_share(ShareholderId, Share, 'ValidateInit'),
     try kds_keyring_manager:validate_init(ShareholderId, VerifiedShare) of
         {more, More} ->
             {ok, {more_keys_needed, More}};
         ok ->
             {ok, {success, #'Success'{}}}
     catch
-        verification_failed ->
-            raise(#'VerificationFailed'{});
         {invalid_status, Status} ->
             raise(#'InvalidStatus'{status = Status});
         {invalid_activity, Activity} ->
@@ -70,15 +68,13 @@ handle_function_('StartUnlock', [], _Context, _Opts) ->
             raise(#'InvalidActivity'{activity = Activity})
     end;
 handle_function_('ConfirmUnlock', [ShareholderId, Share], _Context, _Opts) ->
-    VerifiedShare = verify_signed_share(ShareholderId, Share),
+    VerifiedShare = verify_signed_share(ShareholderId, Share, 'ConfirmUnlock'),
     try kds_keyring_manager:confirm_unlock(ShareholderId, VerifiedShare) of
         {more, More} ->
             {ok, {more_keys_needed, More}};
         ok ->
             {ok, {success, #'Success'{}}}
     catch
-        verification_failed ->
-            raise(#'VerificationFailed'{});
         {invalid_status, Status} ->
             raise(#'InvalidStatus'{status = Status});
         {invalid_activity, Activity} ->
@@ -99,15 +95,13 @@ handle_function_('StartRotate', [], _Context, _Opts) ->
             raise(#'InvalidActivity'{activity = Activity})
     end;
 handle_function_('ConfirmRotate', [ShareholderId, Share], _Context, _Opts) ->
-    VerifiedShare = verify_signed_share(ShareholderId, Share),
+    VerifiedShare = verify_signed_share(ShareholderId, Share, 'ConfirmRotate'),
     try kds_keyring_manager:confirm_rotate(ShareholderId, VerifiedShare) of
         {more, More} ->
             {ok, {more_keys_needed, More}};
         ok ->
             {ok, {success, #'Success'{}}}
     catch
-        verification_failed ->
-            raise(#'VerificationFailed'{});
         {invalid_status, Status} ->
             raise(#'InvalidStatus'{status = Status});
         {invalid_activity, Activity} ->
@@ -130,7 +124,7 @@ handle_function_('StartRekey', [Threshold], _Context, _Opts) ->
             raise(#'InvalidArguments'{})
     end;
 handle_function_('ConfirmRekey', [ShareholderId, Share], _Context, _Opts) ->
-    VerifiedShare = verify_signed_share(ShareholderId, Share),
+    VerifiedShare = verify_signed_share(ShareholderId, Share, 'ConfirmRekey'),
     try kds_keyring_manager:confirm_rekey(ShareholderId, VerifiedShare) of
         {more, More} ->
             {ok, {more_keys_needed, More}};
@@ -155,7 +149,7 @@ handle_function_('StartRekeyValidation', [], _Context, _Opts) ->
             raise(#'InvalidActivity'{activity = Activity})
     end;
 handle_function_('ValidateRekey', [ShareholderId, Share], _Context, _Opts) ->
-    VerifiedShare = verify_signed_share(ShareholderId, Share),
+    VerifiedShare = verify_signed_share(ShareholderId, Share, 'ValidateRekey'),
     try kds_keyring_manager:validate_rekey(ShareholderId, VerifiedShare) of
         {more, More} ->
             {ok, {more_keys_needed, More}};
@@ -220,18 +214,24 @@ encode_encrypted_share(#{
     }.
 
 -spec verify_signed_share(kds_shareholder:shareholder_id(),
-    kds_keysharing:signed_masterkey_share()) -> kds_keysharing:masterkey_share().
+    kds_keysharing:signed_masterkey_share(), atom()) -> kds_keysharing:masterkey_share().
 
-verify_signed_share(ShareholderId, SignedShare) ->
+verify_signed_share(ShareholderId, SignedShare, OperationId) ->
     case kds_shareholder:get_public_key_by_id(ShareholderId, sig) of
         {ok, PublicKey} ->
             case kds_crypto:verify(PublicKey, SignedShare) of
                 {ok, Share} ->
+                    _ = logger:info("Shareholder ~w finished verification of operation ~w",
+                        [ShareholderId, OperationId]),
                     Share;
                 {error, failed_to_verify} ->
+                    _ = logger:info("Shareholder ~w failed verification of operation ~w",
+                        [ShareholderId, OperationId]),
                     raise(#'VerificationFailed'{})
             end;
         {error, not_found} ->
+            _ = logger:info("Shareholder ~w failed verification of operation ~w",
+                [ShareholderId, OperationId]),
             raise(#'VerificationFailed'{})
     end.
 
