@@ -43,9 +43,9 @@
     }
 }.
 -type key_id() :: kds_keyring:key_id().
--type encoded_keyring_meta() :: #'KeyringMeta'{}.
--type encoded_keyring_meta_diff() :: #'KeyringMetaDiff'{}.
--type encoded_security_parameters() :: #'SecurityParameters'{}.
+-type encoded_keyring_meta() :: #'cds_KeyringMeta'{}.
+-type encoded_keyring_meta_diff() :: #'cds_KeyringMetaDiff'{}.
+-type encoded_security_parameters() :: #'cds_SecurityParameters'{}.
 
 -spec get_default_keyring_meta(kds_keyring:keyring_data()) -> keyring_meta().
 get_default_keyring_meta(KeyringData) ->
@@ -83,7 +83,7 @@ update_current_key_id(_OldCurrentKeyId, NewCurrentKeyId) ->
     NewCurrentKeyId.
 
 -spec decode_keyring_meta_diff(encoded_keyring_meta_diff()) -> keyring_meta_diff().
-decode_keyring_meta_diff(#'KeyringMetaDiff'{
+decode_keyring_meta_diff(#'cds_KeyringMetaDiff'{
     current_key_id = CurrentKeyId,
     keys_meta = KeysMeta
 }) ->
@@ -91,7 +91,7 @@ decode_keyring_meta_diff(#'KeyringMetaDiff'{
     #{current_key_id => CurrentKeyId, keys => DecodedKeysMeta}.
 
 -spec decode_keyring_meta(encoded_keyring_meta()) -> keyring_meta().
-decode_keyring_meta(#'KeyringMeta'{
+decode_keyring_meta(#'cds_KeyringMeta'{
     current_key_id = CurrentKeyId,
     keys_meta = KeysMeta
 }) ->
@@ -102,7 +102,7 @@ decode_keys_meta_diff(undefined) ->
     undefined;
 decode_keys_meta_diff(KeysMetaDiff) ->
     maps:fold(
-        fun(K, #'KeyMetaDiff'{retired = Retired}, Acc) ->
+        fun(K, #'cds_KeyMetaDiff'{retired = Retired}, Acc) ->
             Acc#{K => #{retired => Retired}}
         end,
         #{},
@@ -111,7 +111,7 @@ decode_keys_meta_diff(KeysMetaDiff) ->
 decode_keys_meta(KeysMeta) ->
     maps:fold(
         fun(K,
-            #'KeyMeta'{
+            #'cds_KeyMeta'{
                 retired = Retired,
                 security_parameters = SecurityParameters
             },
@@ -125,35 +125,35 @@ decode_keys_meta(KeysMeta) ->
         KeysMeta).
 
 -spec decode_security_parameters(encoded_security_parameters()) -> security_parameters().
-decode_security_parameters(#'SecurityParameters'{deduplication_hash_opts = HashOpts}) ->
+decode_security_parameters(#'cds_SecurityParameters'{deduplication_hash_opts = HashOpts}) ->
     #{deduplication_hash_opts => decode_scrypt_opts(HashOpts)}.
 
-decode_scrypt_opts(#'ScryptOptions'{n = N, r = R, p = P}) ->
+decode_scrypt_opts(#'cds_ScryptOptions'{n = N, r = R, p = P}) ->
     #{n => N, r => R, p => P}.
 
 -spec encode_keyring_meta_diff(keyring_meta_diff()) -> encoded_keyring_meta_diff().
 encode_keyring_meta_diff(KeyringMetaDiff) ->
-    #'KeyringMetaDiff'{
+    #'cds_KeyringMetaDiff'{
         current_key_id = maps:get(current_key_id, KeyringMetaDiff, undefined),
         keys_meta = encode_keys_meta_diff(maps:get(keys, KeyringMetaDiff, undefined))
     }.
 
 -spec encode_keyring_meta(keyring_meta() | undefined) -> encoded_keyring_meta().
 encode_keyring_meta(undefined) ->
-    #'KeyringMeta'{current_key_id = 0, keys_meta = #{}};
+    #'cds_KeyringMeta'{current_key_id = 0, keys_meta = #{}};
 encode_keyring_meta(#{
     current_key_id := CurrentKeyId,
     keys := KeysMeta
 }) ->
     EncodedKeysMeta = encode_keys_meta(KeysMeta),
-    #'KeyringMeta'{current_key_id = CurrentKeyId, keys_meta = EncodedKeysMeta}.
+    #'cds_KeyringMeta'{current_key_id = CurrentKeyId, keys_meta = EncodedKeysMeta}.
 
 encode_keys_meta_diff(undefined) ->
     undefined;
 encode_keys_meta_diff(KeysMetaDiff) ->
     maps:fold(
         fun(K, #{retired := Retired}, Acc) ->
-            Acc#{K => #'KeyMetaDiff'{retired = Retired}}
+            Acc#{K => #'cds_KeyMetaDiff'{retired = Retired}}
         end,
         #{},
         KeysMetaDiff
@@ -169,7 +169,7 @@ encode_keys_meta(KeysMeta) ->
                 security_parameters := SecurityParameters
             },
             Acc) ->
-            Acc#{K => #'KeyMeta'{
+            Acc#{K => #'cds_KeyMeta'{
                 retired = Retired,
                 security_parameters = encode_security_parameters(SecurityParameters)
             }}
@@ -180,7 +180,7 @@ encode_keys_meta(KeysMeta) ->
 
 -spec encode_security_parameters(security_parameters()) -> encoded_security_parameters().
 encode_security_parameters(#{deduplication_hash_opts := ScryptOpts}) ->
-    #'SecurityParameters'{deduplication_hash_opts = encode_scrypt_opts(ScryptOpts)}.
+    #'cds_SecurityParameters'{deduplication_hash_opts = encode_scrypt_opts(ScryptOpts)}.
 
 encode_scrypt_opts(#{n := N, r := R, p := P}) ->
-    #'ScryptOptions'{n = N, r = R, p = P}.
+    #'cds_ScryptOptions'{n = N, r = R, p = P}.

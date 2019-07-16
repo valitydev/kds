@@ -27,7 +27,7 @@ call(ServiceCode, Function, Args, RootUrl, ExtraOpts) ->
     Path = genlib:to_binary(kds_thrift_services:path(ServiceCode)),
     CallOpts = maps:merge(ExtraOpts, #{
         url => <<RootUrl/binary, Path/binary>>,
-        event_handler => scoper_woody_event_handler
+        event_handler => kds_woody_event_handler
     }),
     case woody_client:call(Request, CallOpts) of
         {ok, Result} ->

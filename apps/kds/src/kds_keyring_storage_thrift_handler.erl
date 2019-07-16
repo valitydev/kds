@@ -16,7 +16,18 @@
 handle_function(OperationID, Args, Context, Opts) ->
     scoper:scope(
         keyring_storage,
-        fun() -> handle_function_(OperationID, Args, Context, Opts) end
+        fun() ->
+            try
+                handle_function_(OperationID, Args, Context, Opts)
+            catch
+                throw:Exception ->
+                    throw(Exception);
+                error:{woody_error, _} = WoodyError:Stacktrace ->
+                    erlang:raise(error, WoodyError, Stacktrace);
+                Class:_Exception:Stacktrace ->
+                    erlang:raise(Class, '***', Stacktrace)
+            end
+        end
     ).
 
 handle_function_('GetKeyring', [], _Context, _Opts) ->
@@ -25,7 +36,7 @@ handle_function_('GetKeyring', [], _Context, _Opts) ->
             {ok, encode_keyring(Keyring)}
     catch
         {invalid_status, Status} ->
-            raise(#'InvalidStatus'{status = Status})
+            raise(#'cds_InvalidStatus'{status = Status})
     end.
 
 encode_keyring(#{
@@ -38,7 +49,7 @@ encode_keyring(#{
         keys := KeysMeta
     }
 }) ->
-    #'Keyring'{
+    #'cds_Keyring'{
         version = Version,
         current_key_id = CurrentKeyId,
         keys = encode_keys(Keys, KeysMeta)
@@ -51,9 +62,9 @@ encode_keys(Keys, KeysMeta) ->
                 retired := Retired,
                 security_parameters := SecurityParameters
             } = maps:get(K, KeysMeta),
-            Acc#{K => #'Key'{
+            Acc#{K => #'cds_Key'{
                 data = V,
-                meta = #'KeyMeta'{
+                meta = #'cds_KeyMeta'{
                     retired = Retired,
                     security_parameters = kds_keyring_meta:encode_security_parameters(SecurityParameters)
                 }

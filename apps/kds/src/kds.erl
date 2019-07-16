@@ -41,7 +41,7 @@ init([]) ->
             handlers => [
                 kds_thrift_services:http_handler(keyring_management)
             ],
-            event_handler     => scoper_woody_event_handler,
+            event_handler     => kds_woody_event_handler,
             ip                => IP,
             port              => genlib_app:env(?MODULE, management_port, 8022),
             transport_opts    => genlib_app:env(?MODULE, management_transport_opts, #{}),
@@ -56,7 +56,7 @@ init([]) ->
             handlers => [
                 kds_thrift_services:http_handler(keyring_storage)
             ],
-            event_handler     => scoper_woody_event_handler,
+            event_handler     => kds_woody_event_handler,
             ip                => IP,
             port              => genlib_app:env(?MODULE, storage_port, 8023),
             transport_opts    => genlib_app:env(?MODULE, storage_transport_opts, #{}),
