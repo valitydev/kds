@@ -21,12 +21,12 @@
 -define(STATEM, ?MODULE).
 
 -record(data, {
-    threshold,
-    validation_keyring,
-    shareholders,
-    confirmation_shares = #{},
-    validation_shares = #{},
-    timer
+    threshold :: pos_integer() | undefined,
+    validation_keyring :: encrypted_keyring() | undefined,
+    shareholders :: kds_shareholder:shareholders() | undefined,
+    confirmation_shares = #{} :: masterkey_shares(),
+    validation_shares = #{} :: masterkey_shares(),
+    timer :: reference() | undefined
 }).
 
 -type shareholder_id() :: kds_shareholder:shareholder_id().

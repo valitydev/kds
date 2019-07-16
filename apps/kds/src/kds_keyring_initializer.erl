@@ -19,11 +19,11 @@
 -define(STATEM, ?MODULE).
 
 -record(data, {
-    num,
-    threshold,
-    keyring,
-    shares = #{},
-    timer
+    num :: pos_integer() | undefined,
+    threshold :: pos_integer() | undefined,
+    keyring :: encrypted_keyring() | undefined,
+    shares = #{} :: masterkey_shares_map(),
+    timer :: reference() | undefined
 }).
 
 -type shareholder_id() :: kds_shareholder:shareholder_id().

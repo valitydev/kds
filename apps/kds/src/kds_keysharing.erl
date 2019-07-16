@@ -29,8 +29,8 @@
 -type masterkey_shares() :: [masterkey_share()].
 -type masterkey_shares_map() :: #{share_id() => {shareholder_id(), masterkey_share()}}.
 -type signed_masterkey_share() :: binary().
--type share_id() :: byte().
--type threshold() :: byte().
+-type share_id() :: pos_integer().
+-type threshold() :: pos_integer().
 -type share() :: #share{
     threshold :: threshold(),
     x :: share_id(),
