@@ -1,5 +1,7 @@
 -module(kds_ct_keyring).
 
+-include_lib("shamir/include/shamir.hrl").
+
 -export([init/1]).
 -export([rekey/1]).
 -export([lock/1]).
@@ -7,8 +9,11 @@
 -export([rotate/1]).
 
 -export([decrypt_and_sign_masterkeys/3]).
+-export([decrypt_and_reconstruct/3]).
 -export([validate_init/2]).
 -export([validate_rekey/2]).
+
+-export([marshall_old_format/1]).
 
 %%
 %% Internal types
@@ -40,6 +45,29 @@ decrypt_and_sign_masterkeys(EncryptedMasterKeyShares, EncPrivateKeys, SigPrivate
                 {Id, kds_crypto:sign(SigPrivateKey, DecryptedShare)}
         end,
         EncryptedMasterKeyShares).
+
+-spec decrypt_and_reconstruct(kds_keysharing:encrypted_master_key_shares(), map(), integer()) ->
+    kds_keysharing:masterkey().
+
+decrypt_and_reconstruct(EncryptedMasterKeyShares, EncPrivateKeys, Threshold) ->
+    {ThresholdEncryptedMasterKeyShares, _} = lists:split(Threshold, EncryptedMasterKeyShares),
+    Shares = lists:foldl(
+        fun (#{id := Id, encrypted_share := EncryptedShare}, Acc) ->
+            EncPrivateKey = maps:get(Id, EncPrivateKeys),
+            DecryptedShare = kds_crypto:private_decrypt(EncPrivateKey, EncryptedShare),
+            [DecryptedShare | Acc]
+        end,
+        [],
+        ThresholdEncryptedMasterKeyShares
+    ),
+    case kds_keysharing:recover(Shares) of
+        {ok, MasterKey} ->
+            MasterKey;
+        {error, failed_to_recover} ->
+            _ = logger:error("failed to recover Shares: ~p~nEncryptedMasterKeyShares: ~p",
+                [Shares, EncryptedMasterKeyShares]),
+            throw(recover_error)
+    end.
 
 -spec validate_init([{kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()}], config()) -> ok.
 
@@ -96,6 +124,14 @@ rotate(C) ->
     ok = kds_keyring_client:start_rotate(root_url(C)),
     {more_keys_needed, 1} = kds_keyring_client:confirm_rotate(Id1, MasterKey1, root_url(C)),
     ok = kds_keyring_client:confirm_rotate(Id2, MasterKey2, root_url(C)).
+
+-spec marshall_old_format(term()) -> binary().
+marshall_old_format(#{current_key := CurrentKey, keys := Keys}) ->
+    <<CurrentKey, (maps:fold(fun marshall_keys/3, <<>>, Keys))/binary>>.
+
+-spec marshall_keys(byte(), binary(), binary()) -> binary().
+marshall_keys(KeyId, Key, Acc) ->
+    <<Acc/binary, KeyId, Key:32/binary>>.
 
 config(Key, Config) ->
     config(Key, Config, undefined).

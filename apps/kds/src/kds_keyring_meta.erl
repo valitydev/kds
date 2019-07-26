@@ -47,11 +47,23 @@
 -type encoded_keyring_meta_diff() :: #'cds_KeyringMetaDiff'{}.
 -type encoded_security_parameters() :: #'cds_SecurityParameters'{}.
 
+-define(DEFAULT_SEC_PARAMS, #{
+    deduplication_hash_opts => #{
+        n => 16384,
+        r => 8,
+        p => 1
+    }
+}).
+-define(DEFAULT_KEY_META, #{
+    retired => false,
+    security_parameters => application:get_env(kds, new_key_security_parameters, ?DEFAULT_SEC_PARAMS)
+}).
+
 -spec get_default_keyring_meta(kds_keyring:keyring_data()) -> keyring_meta().
 get_default_keyring_meta(KeyringData) ->
     Keys = maps:get(keys, KeyringData),
     CurrentKeyId = lists:max(maps:keys(Keys)),
-    KeysMeta = maps:map(fun(_KeyId, _Key) -> #{retired => false} end, Keys),
+    KeysMeta = maps:map(fun(_KeyId, _Key) -> ?DEFAULT_KEY_META end, Keys),
     #{current_key_id => CurrentKeyId, version => 1, keys => KeysMeta}.
 
 -spec update_meta(keyring_meta(), keyring_meta_diff()) -> keyring_meta().

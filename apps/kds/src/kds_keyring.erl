@@ -114,20 +114,26 @@ encrypt(MasterKey, #{data := KeyringData, meta := KeyringMeta}) ->
 
 -spec decrypt(key(), encrypted_keyring()) -> {ok, keyring()} | {error, decryption_failed}.
 decrypt(MasterKey, #{data := EncryptedKeyringData, meta := KeyringMeta}) ->
-    try unmarshall(kds_crypto:decrypt(MasterKey, base64:decode(EncryptedKeyringData))) of
-        KeyringData ->
-            case KeyringMeta of
-                undefined ->
+    case KeyringMeta of
+        undefined ->
+            try unmarshall(kds_crypto:decrypt(MasterKey, EncryptedKeyringData)) of
+                KeyringData ->
                     {ok, #{
                         data => KeyringData,
                         meta => kds_keyring_meta:get_default_keyring_meta(KeyringData)
-                    }};
-                _ ->
+                    }}
+            catch
+                decryption_failed ->
+                    {error, decryption_failed}
+            end;
+        _ ->
+            try unmarshall(kds_crypto:decrypt(MasterKey, base64:decode(EncryptedKeyringData))) of
+                KeyringData ->
                     {ok, #{data => KeyringData, meta => KeyringMeta}}
+            catch
+                decryption_failed ->
+                    {error, decryption_failed}
             end
-    catch
-        decryption_failed ->
-            {error, decryption_failed}
     end.
 
 -spec marshall(keyring_data()) -> binary().
@@ -140,7 +146,7 @@ marshall(#{keys := Keys}) ->
 -spec unmarshall(binary()) -> keyring_data().
 unmarshall(<<MaxKeyId, Keys/binary>> = MarshalledKeyring) ->
     KeysSize = erlang:byte_size(Keys),
-    case (KeysSize div 33 =:= MaxKeyId) and (KeysSize rem 33 =:= 0) of
+    case (KeysSize div 33 =:= (MaxKeyId + 1)) and (KeysSize rem 33 =:= 0) of
         true ->
             #{keys => unmarshall_keys(Keys, #{})};
         false ->

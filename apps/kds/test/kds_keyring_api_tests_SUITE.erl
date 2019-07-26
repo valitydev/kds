@@ -14,6 +14,7 @@
 -export([init_with_cancel/1]).
 -export([lock/1]).
 -export([unlock/1]).
+-export([unlock_old_keyring/1]).
 -export([unlock_with_timeout/1]).
 -export([rekey/1]).
 -export([rekey_with_timeout/1]).
@@ -63,6 +64,8 @@ groups() ->
         ]},
         {basic_lifecycle, [sequence], [
             init,
+            lock,
+            unlock_old_keyring,
             lock,
             unlock,
             rekey,
@@ -142,7 +145,8 @@ end_per_group(_, C) ->
 -spec init(config()) -> _.
 
 init(C) ->
-    EncryptedMasterKeyShares = kds_keyring_client:start_init(2, root_url(C)),
+    Threshold = 2,
+    EncryptedMasterKeyShares = kds_keyring_client:start_init(Threshold, root_url(C)),
     Shareholders = kds_shareholder:get_all(),
     _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
@@ -173,7 +177,9 @@ init(C) ->
         },
         kds_keyring_client:get_state(root_url(C))
     ),
-    kds_ct_utils:store(master_keys, DecryptedMasterKeyShares, C).
+    MasterKey = kds_ct_keyring:decrypt_and_reconstruct(EncryptedMasterKeyShares, EncPrivateKeys, Threshold),
+    ok = kds_ct_utils:store(master_keys, DecryptedMasterKeyShares, C),
+    kds_ct_utils:store(master_key, MasterKey, C).
 
 -spec init_with_timeout(config()) -> _.
 
@@ -279,6 +285,17 @@ unlock(C) ->
         maps:fold(fun (K, V, Acc) -> Acc#{V => K} end, #{}, ConfirmationShares)
     ),
     _ = ?assertEqual(ok, kds_keyring_client:confirm_unlock(Id2, MasterKey2, root_url(C))).
+
+-spec unlock_old_keyring(config()) -> _.
+
+unlock_old_keyring(C) ->
+    MasterKey = kds_ct_utils:lookup(master_key, C),
+    KeyringStorageOpts = application:get_env(kds, keyring_storage_opts, #{}),
+    KeyringPath = maps:get(keyring_path, KeyringStorageOpts, filename:join(config(priv_dir, C), "keyring")),
+    MarshalledKeyring = kds_ct_keyring:marshall_old_format(#{current_key => 0, keys => #{0 => kds_crypto:key()}}),
+    EncodedOldKeyring = kds_crypto:encrypt(MasterKey, MarshalledKeyring),
+    ok = file:write_file(KeyringPath, EncodedOldKeyring),
+    _ = unlock(C).
 
 -spec unlock_with_timeout(config()) -> _.
 
