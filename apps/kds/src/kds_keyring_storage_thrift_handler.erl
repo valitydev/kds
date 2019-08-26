@@ -29,7 +29,7 @@ handle_function_('GetKeyring', [], _Context, _Opts) ->
             {ok, encode_keyring(Keyring)}
     catch
         {invalid_status, Status} ->
-            raise(#'cds_InvalidStatus'{status = Status})
+            raise(#cds_InvalidStatus{status = Status})
     end.
 
 encode_keyring(#{
@@ -42,7 +42,7 @@ encode_keyring(#{
         keys := KeysMeta
     }
 }) ->
-    #'cds_Keyring'{
+    #cds_Keyring{
         version = Version,
         current_key_id = CurrentKeyId,
         keys = encode_keys(Keys, KeysMeta)
@@ -55,9 +55,9 @@ encode_keys(Keys, KeysMeta) ->
                 retired := Retired,
                 security_parameters := SecurityParameters
             } = maps:get(K, KeysMeta),
-            Acc#{K => #'cds_Key'{
+            Acc#{K => #cds_Key{
                 data = V,
-                meta = #'cds_KeyMeta'{
+                meta = #cds_KeyMeta{
                     retired = Retired,
                     security_parameters = kds_keyring_meta:encode_security_parameters(SecurityParameters)
                 }
