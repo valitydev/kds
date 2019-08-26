@@ -18,18 +18,11 @@
 handle_function(OperationID, Args, Context, Opts) ->
     scoper:scope(
         keyring_management,
-        fun() ->
-            try
+        kds_thrift_handler_utils:filter_fun_exceptions(
+            fun() ->
                 handle_function_(OperationID, Args, Context, Opts)
-            catch
-                throw:Exception ->
-                    throw(Exception);
-                error:{woody_error, _} = WoodyError:Stacktrace ->
-                    erlang:raise(error, WoodyError, Stacktrace);
-                Class:_Exception:Stacktrace ->
-                    erlang:raise(Class, '***', Stacktrace)
             end
-        end
+        )
     ).
 
 handle_function_('StartInit', [Threshold], _Context, _Opts) ->
@@ -312,4 +305,4 @@ decode_signed_share(#'cds_SignedMasterKeyShare'{
 
 -spec raise(_) -> no_return().
 raise(Exception) ->
-    woody_error:raise(business, Exception).
+    kds_thrift_handler_utils:raise(Exception).
