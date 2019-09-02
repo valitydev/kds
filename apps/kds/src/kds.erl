@@ -34,7 +34,8 @@ stop() ->
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     {ok, IP} = inet:parse_address(application:get_env(kds, ip, "::")),
-    HealthCheckers = genlib_app:env(?MODULE, health_checkers, []),
+    HealthCheck = genlib_app:env(?MODULE, health_check, #{}),
+    HealthRoute = erl_health_handle:get_route(enable_health_logging(HealthCheck)),
     KeyringManagementService = woody_server:child_spec(
         kds_thrift_management_service_sup,
         #{
@@ -47,7 +48,7 @@ init([]) ->
             transport_opts    => genlib_app:env(?MODULE, management_transport_opts, #{}),
             protocol_opts     => genlib_app:env(?MODULE, protocol_opts, #{}),
             shutdown_timeout  => genlib_app:env(?MODULE, shutdown_timeout, 0),
-            additional_routes => [erl_health_handle:get_route(HealthCheckers)]
+            additional_routes => [HealthRoute]
         }
     ),
     KeyringStorageService = woody_server:child_spec(
@@ -62,7 +63,7 @@ init([]) ->
             transport_opts    => genlib_app:env(?MODULE, storage_transport_opts, #{}),
             protocol_opts     => genlib_app:env(?MODULE, protocol_opts, #{}),
             shutdown_timeout  => genlib_app:env(?MODULE, shutdown_timeout, 0),
-            additional_routes => []
+            additional_routes => [HealthRoute]
         }
     ),
     KeyringSupervisor = #{
@@ -79,6 +80,11 @@ init([]) ->
         KeyringStorageService
     ],
     {ok, {{one_for_one, 1, 5}, Procs}}.
+
+-spec enable_health_logging(erl_health:check()) -> erl_health:check().
+enable_health_logging(Check) ->
+    EvHandler = {erl_health_event_handler, []},
+    maps:map(fun (_, V = {_, _, _}) -> #{runner => V, event_handler => EvHandler} end, Check).
 
 
 %%
