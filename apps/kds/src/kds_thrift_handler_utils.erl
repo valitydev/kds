@@ -41,16 +41,16 @@ filter_stacktrace(Stacktrace) when is_list(Stacktrace) ->
 
 filter_stacktrace_item({Module, Function, Arity, Location} = ST) when
     is_atom(Module) andalso
-    is_atom(Function) andalso
-    is_integer(Arity) andalso
-    is_list(Location)
+        is_atom(Function) andalso
+        is_integer(Arity) andalso
+        is_list(Location)
 ->
     ST;
 filter_stacktrace_item({Module, Function, Args, Location}) when
     is_atom(Module) andalso
-    is_atom(Function) andalso
-    is_list(Args) andalso
-    is_list(Location)
+        is_atom(Function) andalso
+        is_list(Args) andalso
+        is_list(Location)
 ->
     {Module, Function, filter_stacktrace_args(Args), Location};
 filter_stacktrace_item(_) ->
@@ -73,9 +73,9 @@ filter(Reason) when is_map(Reason) ->
     );
 filter(Reason) when
     is_atom(Reason) orelse
-    is_number(Reason) orelse
-    is_reference(Reason) orelse
-    is_pid(Reason)
+        is_number(Reason) orelse
+        is_reference(Reason) orelse
+        is_pid(Reason)
 ->
     Reason;
 % Other

@@ -22,7 +22,7 @@
 %% internal types
 
 -type key() :: <<_:256>>.
--type iv()  :: binary().
+-type iv() :: binary().
 -type tag() :: binary().
 -type aad() :: binary().
 -type jose_jwk() :: #jose_jwk{}.
@@ -41,6 +41,7 @@
     aad :: aad(),
     cipher :: binary()
 }).
+
 -type cedf() :: #cedf{}.
 
 -define(CIPHER_TYPE, aes_gcm).
@@ -58,21 +59,23 @@ encrypt(Key, Plain) ->
     try
         {Cipher, Tag} = crypto:block_encrypt(?CIPHER_TYPE, Key, IV, {AAD, Plain}),
         marshall_cedf(#cedf{iv = IV, aad = AAD, cipher = Cipher, tag = Tag})
-    catch Class:_Reason:Stacktrace ->
-        _ = logger:error("encryption failed with ~p ST: ~p", [Class, Stacktrace]),
-        throw(encryption_failed)
+    catch
+        Class:_Reason:Stacktrace ->
+            _ = logger:error("encryption failed with ~p ST: ~p", [Class, Stacktrace]),
+            throw(encryption_failed)
     end.
 
 -spec public_encrypt(jwk_map(), binary()) -> jwe_compacted().
 public_encrypt(PublicKey, Plain) ->
     JWKPublicKey = jose_jwk:from(PublicKey),
     EncryptorWithoutKid = jose_jwk:block_encryptor(JWKPublicKey),
-    Encryptor = case JWKPublicKey#jose_jwk.fields of
-        #{<<"kid">> := Kid} ->
-            EncryptorWithoutKid#{<<"kid">> => Kid};
-        _ ->
-            EncryptorWithoutKid
-    end,
+    Encryptor =
+        case JWKPublicKey#jose_jwk.fields of
+            #{<<"kid">> := Kid} ->
+                EncryptorWithoutKid#{<<"kid">> => Kid};
+            _ ->
+                EncryptorWithoutKid
+        end,
     {_EncryptionAlgo, JWEPlain} =
         jose_jwe:block_encrypt(JWKPublicKey, Plain, jose_jwe:from(Encryptor)),
     {#{}, JWECompacted} = jose_jwe:compact(JWEPlain),
@@ -88,9 +91,10 @@ decrypt(Key, MarshalledCEDF) ->
             throw(decryption_failed);
         Plain ->
             Plain
-    catch Type:_Error:Stacktrace ->
-        _ = logger:error("decryption failed with ~p ST: ~p", [Type, Stacktrace]),
-        throw(decryption_failed)
+    catch
+        Type:_Error:Stacktrace ->
+            _ = logger:error("decryption failed with ~p ST: ~p", [Type, Stacktrace]),
+            throw(decryption_failed)
     end.
 
 -spec private_decrypt(jwk_encoded(), jwe_compacted()) -> binary().
@@ -144,13 +148,10 @@ aad() ->
     crypto:strong_rand_bytes(4).
 
 -spec marshall_cedf(cedf()) -> binary().
-marshall_cedf(#cedf{tag = Tag, iv = IV, aad = AAD, cipher = Cipher})
-    when
-        bit_size(Tag) =:= 128,
-        bit_size(IV) =:= 128,
-        bit_size(AAD) =:= 32
-    ->
-        <<Tag:16/binary, IV:16/binary, AAD:4/binary, Cipher/binary>>.
+marshall_cedf(#cedf{tag = Tag, iv = IV, aad = AAD, cipher = Cipher}) when
+    bit_size(Tag) =:= 128, bit_size(IV) =:= 128, bit_size(AAD) =:= 32
+->
+    <<Tag:16/binary, IV:16/binary, AAD:4/binary, Cipher/binary>>.
 
 -spec unmarshall_cedf(binary()) -> cedf().
 unmarshall_cedf(<<Tag:16/binary, IV:16/binary, AAD:4/binary, Cipher/binary>>) ->

@@ -15,6 +15,7 @@
 -export([get_status/0]).
 -export([cancel/0]).
 -export([handle_event/4]).
+
 -export_type([status/0]).
 -export_type([state/0]).
 
@@ -40,38 +41,33 @@
 -type keyring() :: kds_keyring:keyring().
 -type unlock_errors() ::
     wrong_masterkey | failed_to_recover.
+
 -type invalid_activity() :: {error, {invalid_activity, {unlock, state()}}}.
 -type unlock_resp() ::
-    {ok, {done, keyring()}} |
-    {ok, {more, pos_integer()}} |
-    {error, {operation_aborted, unlock_errors()}}.
+    {ok, {done, keyring()}}
+    | {ok, {more, pos_integer()}}
+    | {error, {operation_aborted, unlock_errors()}}.
 
 -spec callback_mode() -> handle_event_function.
-
 callback_mode() -> handle_event_function.
 
 -spec start_link() -> {ok, pid()}.
-
 start_link() ->
     gen_statem:start_link({local, ?STATEM}, ?MODULE, [], []).
 
 -spec initialize() -> ok | invalid_activity().
-
 initialize() ->
     call(initialize).
 
 -spec confirm(shareholder_id(), masterkey_share(), locked_keyring()) -> unlock_resp() | invalid_activity().
-
 confirm(ShareholderId, Share, LockedKeyring) ->
     call({confirm, ShareholderId, Share, LockedKeyring}).
 
 -spec cancel() -> ok.
-
 cancel() ->
     call(cancel).
 
 -spec get_status() -> status().
-
 get_status() ->
     call(get_status).
 
@@ -79,47 +75,36 @@ call(Msg) ->
     gen_statem:call(?STATEM, Msg).
 
 -spec init(_) -> {ok, state(), data()}.
-
 init([]) ->
     {ok, uninitialized, #data{}}.
 
--spec handle_event(gen_statem:event_type(), term(), state(), data()) ->
-    gen_statem:event_handler_result(state()).
-
+-spec handle_event(gen_statem:event_type(), term(), state(), data()) -> gen_statem:event_handler_result(state()).
 %% Successful workflow events
 
 handle_event({call, From}, initialize, uninitialized, _Data) ->
     TimerRef = erlang:start_timer(get_timeout(), self(), lifetime_expired),
     _ = logger:info("kds_keyring_unlocker changed state to validation"),
-    {next_state,
-        validation,
-        #data{timer = TimerRef},
-        {reply, From, ok}};
-
-handle_event({call, From}, {confirm, ShareholderId, Share, LockedKeyring}, validation,
-    #data{shares = Shares, timer = TimerRef} = StateData) ->
+    {next_state, validation, #data{timer = TimerRef}, {reply, From, ok}};
+handle_event(
+    {call, From},
+    {confirm, ShareholderId, Share, LockedKeyring},
+    validation,
+    #data{shares = Shares, timer = TimerRef} = StateData
+) ->
     #share{threshold = Threshold, x = X} = kds_keysharing:decode_share(Share),
     case Shares#{X => {ShareholderId, Share}} of
         AllShares when map_size(AllShares) =:= Threshold ->
             _ = erlang:cancel_timer(TimerRef),
             Result = unlock(LockedKeyring, AllShares),
             _ = logger:info("kds_keyring_unlocker changed state to uninitialized"),
-            {next_state,
-                uninitialized,
-                #data{shares = kds_keysharing:clear_shares(Shares)},
-                {reply, From, Result}};
+            {next_state, uninitialized, #data{shares = kds_keysharing:clear_shares(Shares)}, {reply, From, Result}};
         More ->
-            {keep_state,
-                StateData#data{shares = More},
-                {reply, From, {ok, {more, Threshold - map_size(More)}}}}
+            {keep_state, StateData#data{shares = More}, {reply, From, {ok, {more, Threshold - map_size(More)}}}}
     end;
-
 %% Common events
 
 handle_event({call, From}, get_state, State, _Data) ->
-    {keep_state_and_data,
-        {reply, From, State}
-    };
+    {keep_state_and_data, {reply, From, State}};
 handle_event({call, From}, get_status, State, #data{timer = TimerRef, shares = ValidationShares}) ->
     Lifetime = get_lifetime(TimerRef),
     ValidationSharesStripped = kds_keysharing:get_id_map(ValidationShares),
@@ -136,25 +121,18 @@ handle_event({call, From}, cancel, _State, #data{timer = TimerRef}) ->
 handle_event(info, {timeout, _TimerRef, lifetime_expired}, _State, _Data) ->
     _ = logger:info("kds_keyring_unlocker changed state to uninitialized"),
     {next_state, uninitialized, #data{}, []};
-
 %% InvalidActivity events
 
 handle_event({call, From}, _Event, uninitialized, _Data) ->
-    {keep_state_and_data,
-        {reply, From, {error, {invalid_activity, {unlock, uninitialized}}}}
-    };
+    {keep_state_and_data, {reply, From, {error, {invalid_activity, {unlock, uninitialized}}}}};
 handle_event({call, From}, _Event, validation, _Data) ->
-    {keep_state_and_data,
-        {reply, From, {error, {invalid_activity, {unlock, validation}}}}
-    }.
+    {keep_state_and_data, {reply, From, {error, {invalid_activity, {unlock, validation}}}}}.
 
 -spec get_timeout() -> non_neg_integer().
-
 get_timeout() ->
     application:get_env(kds, keyring_unlock_lifetime, 60000).
 
 -spec get_lifetime(reference() | undefined) -> seconds() | undefined.
-
 get_lifetime(TimerRef) ->
     case TimerRef of
         undefined ->
@@ -165,7 +143,6 @@ get_lifetime(TimerRef) ->
 
 -spec unlock(locked_keyring(), masterkey_shares_map()) ->
     {ok, {done, keyring()}} | {error, {operation_aborted, unlock_errors()}}.
-
 unlock(LockedKeyring, AllShares) ->
     ListShares = kds_keysharing:get_shares(AllShares),
     case kds_keysharing:recover(ListShares) of

@@ -1,4 +1,5 @@
 -module(kds_keyring_management_thrift_handler).
+
 -behaviour(woody_server_thrift_handler).
 
 -include_lib("cds_proto/include/cds_proto_keyring_thrift.hrl").
@@ -14,7 +15,6 @@
 
 -spec handle_function(woody:func(), woody:args(), woody_context:ctx(), woody:options()) ->
     {ok, woody:result()} | no_return().
-
 handle_function(OperationID, Args, Context, Opts) ->
     scoper:scope(
         keyring_management,
@@ -54,19 +54,25 @@ handle_function_('ValidateInit', [SignedShare], _Context, _Opts) ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelInit', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:cancel_init()} catch
+    try
+        {ok, kds_keyring_manager:cancel_init()}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('Lock', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:lock()} catch
+    try
+        {ok, kds_keyring_manager:lock()}
+    catch
         {invalid_status, locked} ->
             {ok, ok};
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('StartUnlock', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:start_unlock()} catch
+    try
+        {ok, kds_keyring_manager:start_unlock()}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
         {invalid_activity, Activity} ->
@@ -89,12 +95,16 @@ handle_function_('ConfirmUnlock', [SignedShare], _Context, _Opts) ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelUnlock', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:cancel_unlock()} catch
+    try
+        {ok, kds_keyring_manager:cancel_unlock()}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('StartRotate', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:start_rotate()} catch
+    try
+        {ok, kds_keyring_manager:start_rotate()}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
         {invalid_activity, Activity} ->
@@ -117,12 +127,16 @@ handle_function_('ConfirmRotate', [SignedShare], _Context, _Opts) ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelRotate', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:cancel_rotate()} catch
+    try
+        {ok, kds_keyring_manager:cancel_rotate()}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('StartRekey', [Threshold], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:start_rekey(Threshold)} catch
+    try
+        {ok, kds_keyring_manager:start_rekey(Threshold)}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
         {invalid_activity, Activity} ->
@@ -173,17 +187,17 @@ handle_function_('ValidateRekey', [SignedShare], _Context, _Opts) ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelRekey', [], _Context, _Opts) ->
-    try {ok, kds_keyring_manager:cancel_rekey()} catch
+    try
+        {ok, kds_keyring_manager:cancel_rekey()}
+    catch
         {invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
-
 handle_function_('GetState', [], _Context, _Opts) ->
     case kds_keyring_manager:get_status() of
         Status ->
             {ok, encode_state(Status)}
     end;
-
 handle_function_('UpdateKeyringMeta', [KeyringMeta], _Context, _Opts) ->
     try
         DecodedKeyringMeta = kds_keyring_meta:decode_keyring_meta_diff(KeyringMeta),
@@ -202,15 +216,11 @@ handle_function_('GetKeyringMeta', [], _Context, _Opts) ->
     EncodedKeyringMeta = kds_keyring_meta:encode_keyring_meta(KeyringMeta),
     {ok, EncodedKeyringMeta}.
 
--spec encode_encrypted_shares([kds_keysharing:encrypted_master_key_share()]) ->
-    [encrypted_masterkey_share()].
-
+-spec encode_encrypted_shares([kds_keysharing:encrypted_master_key_share()]) -> [encrypted_masterkey_share()].
 encode_encrypted_shares(EncryptedMasterKeyShares) ->
     lists:map(fun encode_encrypted_share/1, EncryptedMasterKeyShares).
 
--spec encode_encrypted_share(kds_keysharing:encrypted_master_key_share()) ->
-    encrypted_masterkey_share().
-
+-spec encode_encrypted_share(kds_keysharing:encrypted_master_key_share()) -> encrypted_masterkey_share().
 encode_encrypted_share(#{
     id := Id,
     owner := Owner,
@@ -222,25 +232,33 @@ encode_encrypted_share(#{
         encrypted_share = EncryptedShare
     }.
 
--spec verify_signed_share(kds_shareholder:shareholder_id(),
-    kds_keysharing:signed_masterkey_share(), atom()) -> kds_keysharing:masterkey_share().
-
+-spec verify_signed_share(
+    kds_shareholder:shareholder_id(),
+    kds_keysharing:signed_masterkey_share(),
+    atom()
+) -> kds_keysharing:masterkey_share().
 verify_signed_share(ShareholderId, SignedShare, OperationId) ->
     case kds_shareholder:get_public_key_by_id(ShareholderId, sig) of
         {ok, PublicKey} ->
             case kds_crypto:verify(PublicKey, SignedShare) of
                 {ok, Share} ->
-                    _ = logger:info("Shareholder ~w finished verification of operation ~w",
-                        [ShareholderId, OperationId]),
+                    _ = logger:info(
+                        "Shareholder ~w finished verification of operation ~w",
+                        [ShareholderId, OperationId]
+                    ),
                     Share;
                 {error, failed_to_verify} ->
-                    _ = logger:info("Shareholder ~w failed verification of operation ~w",
-                        [ShareholderId, OperationId]),
+                    _ = logger:info(
+                        "Shareholder ~w failed verification of operation ~w",
+                        [ShareholderId, OperationId]
+                    ),
                     raise(#cds_VerificationFailed{})
             end;
         {error, not_found} ->
-            _ = logger:info("Shareholder ~w failed verification of operation ~w",
-                [ShareholderId, OperationId]),
+            _ = logger:info(
+                "Shareholder ~w failed verification of operation ~w",
+                [ShareholderId, OperationId]
+            ),
             raise(#cds_VerificationFailed{})
     end.
 

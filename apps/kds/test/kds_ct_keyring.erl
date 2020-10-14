@@ -22,7 +22,6 @@
 -type config() :: [{atom(), any()}] | atom().
 
 -spec init(config()) -> _.
-
 init(C) ->
     EncryptedMasterKeyShares = kds_keyring_client:start_init(2, root_url(C)),
     EncPrivateKeys = enc_private_keys(C),
@@ -33,26 +32,24 @@ init(C) ->
 
 -spec decrypt_and_sign_masterkeys(kds_keysharing:encrypted_master_key_shares(), map(), map()) ->
     [{kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()}].
-
 decrypt_and_sign_masterkeys(EncryptedMasterKeyShares, EncPrivateKeys, SigPrivateKeys) ->
     lists:map(
-        fun
-            (#{id := Id, owner := Owner, encrypted_share := EncryptedShare}) ->
-                {ok, #{id := Id, owner := Owner}} = kds_shareholder:get_by_id(Id),
-                EncPrivateKey = maps:get(Id, EncPrivateKeys),
-                SigPrivateKey = maps:get(Id, SigPrivateKeys),
-                DecryptedShare = kds_crypto:private_decrypt(EncPrivateKey, EncryptedShare),
-                {Id, kds_crypto:sign(SigPrivateKey, DecryptedShare)}
+        fun(#{id := Id, owner := Owner, encrypted_share := EncryptedShare}) ->
+            {ok, #{id := Id, owner := Owner}} = kds_shareholder:get_by_id(Id),
+            EncPrivateKey = maps:get(Id, EncPrivateKeys),
+            SigPrivateKey = maps:get(Id, SigPrivateKeys),
+            DecryptedShare = kds_crypto:private_decrypt(EncPrivateKey, EncryptedShare),
+            {Id, kds_crypto:sign(SigPrivateKey, DecryptedShare)}
         end,
-        EncryptedMasterKeyShares).
+        EncryptedMasterKeyShares
+    ).
 
 -spec decrypt_and_reconstruct(kds_keysharing:encrypted_master_key_shares(), map(), integer()) ->
     kds_keysharing:masterkey().
-
 decrypt_and_reconstruct(EncryptedMasterKeyShares, EncPrivateKeys, Threshold) ->
     {ThresholdEncryptedMasterKeyShares, _} = lists:split(Threshold, EncryptedMasterKeyShares),
     Shares = lists:foldl(
-        fun (#{id := Id, encrypted_share := EncryptedShare}, Acc) ->
+        fun(#{id := Id, encrypted_share := EncryptedShare}, Acc) ->
             EncPrivateKey = maps:get(Id, EncPrivateKeys),
             DecryptedShare = kds_crypto:private_decrypt(EncPrivateKey, EncryptedShare),
             [DecryptedShare | Acc]
@@ -64,13 +61,14 @@ decrypt_and_reconstruct(EncryptedMasterKeyShares, EncPrivateKeys, Threshold) ->
         {ok, MasterKey} ->
             MasterKey;
         {error, failed_to_recover} ->
-            _ = logger:error("failed to recover Shares: ~p~nEncryptedMasterKeyShares: ~p",
-                [Shares, EncryptedMasterKeyShares]),
+            _ = logger:error(
+                "failed to recover Shares: ~p~nEncryptedMasterKeyShares: ~p",
+                [Shares, EncryptedMasterKeyShares]
+            ),
             throw(recover_error)
     end.
 
 -spec validate_init([{kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()}], config()) -> ok.
-
 validate_init([{Id, DecryptedMasterKeyShare} | []], C) ->
     kds_keyring_client:validate_init(Id, DecryptedMasterKeyShare, root_url(C));
 validate_init([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
@@ -79,9 +77,7 @@ validate_init([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
         kds_keyring_client:validate_init(Id, DecryptedMasterKeyShare, root_url(C)),
     validate_init(DecryptedMasterKeyShares, C).
 
-
 -spec rekey(config()) -> _.
-
 rekey(C) ->
     ok = kds_keyring_client:start_rekey(2, root_url(C)),
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
@@ -95,7 +91,6 @@ rekey(C) ->
     kds_ct_utils:store(master_keys, DecryptedMasterKeyShares, C).
 
 -spec validate_rekey([{kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()}], config()) -> ok.
-
 validate_rekey([{Id, DecryptedMasterKeyShare} | []], C) ->
     kds_keyring_client:validate_rekey(Id, DecryptedMasterKeyShare, root_url(C));
 validate_rekey([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
@@ -105,12 +100,10 @@ validate_rekey([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
     validate_rekey(DecryptedMasterKeyShares, C).
 
 -spec lock(config()) -> _.
-
 lock(C) ->
     ok = kds_keyring_client:lock(root_url(C)).
 
 -spec unlock(config()) -> _.
-
 unlock(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     ok = kds_keyring_client:start_unlock(root_url(C)),
@@ -118,7 +111,6 @@ unlock(C) ->
     ok = kds_keyring_client:confirm_unlock(Id2, MasterKey2, root_url(C)).
 
 -spec rotate(config()) -> _.
-
 rotate(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     ok = kds_keyring_client:start_rotate(root_url(C)),

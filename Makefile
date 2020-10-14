@@ -18,7 +18,8 @@ BASE_IMAGE_TAG := da0ab769f01b650b389d18fc85e7418e727cbe96
 
 BUILD_IMAGE_TAG := 442c2c274c1d8e484e5213089906a4271641d95e
 
-CALL_W_CONTAINER := all submodules compile xref lint dialyze test devrel release clean distclean
+CALL_W_CONTAINER := all submodules compile xref lint dialyze test devrel \
+					release clean distclean check_format format
 
 .PHONY: $(CALL_W_CONTAINER)
 
@@ -41,6 +42,12 @@ xref: submodules
 
 lint:
 	elvis rock
+
+check_format:
+	$(REBAR) fmt -c
+
+format:
+	$(REBAR) fmt -w
 
 dialyze: submodules
 	$(REBAR) dialyzer

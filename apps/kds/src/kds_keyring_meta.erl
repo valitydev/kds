@@ -22,19 +22,24 @@
         key_id() => key_meta()
     }
 }.
+
 -type keyring_meta_diff() :: #{
     current_key_id => non_neg_integer() | undefined,
     keys => #{
         key_id() => key_meta_diff()
-    } | undefined
+    }
+    | undefined
 }.
+
 -type key_meta() :: #{
     retired := boolean(),
     security_parameters := security_parameters()
 }.
+
 -type key_meta_diff() :: #{
     retired := boolean()
 }.
+
 -type security_parameters() :: #{
     deduplication_hash_opts := #{
         n := pos_integer(),
@@ -42,6 +47,7 @@
         p := pos_integer()
     }
 }.
+
 -type key_id() :: kds_keyring:key_id().
 -type encoded_keyring_meta() :: #cds_KeyringMeta{}.
 -type encoded_keyring_meta_diff() :: #cds_KeyringMetaDiff{}.
@@ -54,6 +60,7 @@
         p => 1
     }
 }).
+
 -define(DEFAULT_KEY_META, #{
     retired => false,
     security_parameters => application:get_env(kds, new_key_security_parameters, ?DEFAULT_SEC_PARAMS)
@@ -87,7 +94,9 @@ update_keys_meta(OldKeysMeta, UpdateKeysMeta) ->
             UpdateKeyMeta = maps:get(K, UpdateKeysMeta, #{}),
             Acc#{K => maps:merge(V, UpdateKeyMeta)}
         end,
-        #{}, OldKeysMeta).
+        #{},
+        OldKeysMeta
+    ).
 
 update_current_key_id(OldCurrentKeyId, undefined) ->
     OldCurrentKeyId;
@@ -118,23 +127,29 @@ decode_keys_meta_diff(KeysMetaDiff) ->
             Acc#{K => #{retired => Retired}}
         end,
         #{},
-        KeysMetaDiff).
+        KeysMetaDiff
+    ).
 
 decode_keys_meta(KeysMeta) ->
     maps:fold(
-        fun(K,
+        fun(
+            K,
             #cds_KeyMeta{
                 retired = Retired,
                 security_parameters = SecurityParameters
             },
-            Acc) ->
-            Acc#{K => #{
-                retired => Retired,
-                security_parameters => decode_security_parameters(SecurityParameters)
-            }}
+            Acc
+        ) ->
+            Acc#{
+                K => #{
+                    retired => Retired,
+                    security_parameters => decode_security_parameters(SecurityParameters)
+                }
+            }
         end,
         #{},
-        KeysMeta).
+        KeysMeta
+    ).
 
 -spec decode_security_parameters(encoded_security_parameters()) -> security_parameters().
 decode_security_parameters(#cds_SecurityParameters{deduplication_hash_opts = HashOpts}) ->
@@ -175,16 +190,20 @@ encode_keys_meta(undefined) ->
     undefined;
 encode_keys_meta(KeysMeta) ->
     maps:fold(
-        fun(K,
+        fun(
+            K,
             #{
                 retired := Retired,
                 security_parameters := SecurityParameters
             },
-            Acc) ->
-            Acc#{K => #cds_KeyMeta{
-                retired = Retired,
-                security_parameters = encode_security_parameters(SecurityParameters)
-            }}
+            Acc
+        ) ->
+            Acc#{
+                K => #cds_KeyMeta{
+                    retired = Retired,
+                    security_parameters = encode_security_parameters(SecurityParameters)
+                }
+            }
         end,
         #{},
         KeysMeta

@@ -1,4 +1,5 @@
 -module(kds_keyring_manager).
+
 -behaviour(gen_statem).
 
 -include_lib("shamir/include/shamir.hrl").
@@ -31,6 +32,7 @@
 -export([handle_event/4]).
 -export([terminate/3]).
 -export([code_change/4]).
+
 -export_type([status/0]).
 -export_type([state/0]).
 
@@ -72,8 +74,7 @@ get_keyring() ->
 start_unlock() ->
     call(start_unlock).
 
--spec confirm_unlock(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, pos_integer()} | ok.
+-spec confirm_unlock(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) -> {more, pos_integer()} | ok.
 confirm_unlock(ShareholderId, Share) ->
     call({confirm_unlock, ShareholderId, Share}).
 
@@ -89,8 +90,7 @@ lock() ->
 start_rotate() ->
     call(start_rotate).
 
--spec confirm_rotate(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, pos_integer()} | ok.
+-spec confirm_rotate(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) -> {more, pos_integer()} | ok.
 confirm_rotate(ShareholderId, Share) ->
     call({confirm_rotate, ShareholderId, Share}).
 
@@ -102,8 +102,7 @@ cancel_rotate() ->
 initialize(Threshold) ->
     call({initialize, Threshold}).
 
--spec validate_init(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, pos_integer()} | ok.
+-spec validate_init(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) -> {more, pos_integer()} | ok.
 validate_init(ShareholderId, Share) ->
     call({validate_init, ShareholderId, Share}).
 
@@ -115,8 +114,7 @@ cancel_init() ->
 start_rekey(Threshold) ->
     call({start_rekey, Threshold}).
 
--spec confirm_rekey(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, pos_integer()} | ok.
+-spec confirm_rekey(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) -> {more, pos_integer()} | ok.
 confirm_rekey(ShareholderId, Share) ->
     call({confirm_rekey, ShareholderId, Share}).
 
@@ -124,8 +122,7 @@ confirm_rekey(ShareholderId, Share) ->
 start_validate_rekey() ->
     call(start_validate_rekey).
 
--spec validate_rekey(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) ->
-    {more, pos_integer()} | ok.
+-spec validate_rekey(kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()) -> {more, pos_integer()} | ok.
 validate_rekey(ShareholderId, Share) ->
     call({validate_rekey, ShareholderId, Share}).
 
@@ -167,9 +164,7 @@ init([]) ->
             {ok, not_initialized, #data{keyring = #{data => undefined, meta => undefined}}}
     end.
 
--spec handle_event(gen_statem:event_type(), term(), state(), data()) ->
-    gen_statem:event_handler_result(state()).
-
+-spec handle_event(gen_statem:event_type(), term(), state(), data()) -> gen_statem:event_handler_result(state()).
 %% not_initialized events
 
 handle_event({call, From}, {initialize, Threshold}, not_initialized, _StateData) ->
@@ -189,7 +184,6 @@ handle_event({call, From}, {validate_init, ShareholderId, Share}, not_initialize
 handle_event({call, From}, cancel_init, not_initialized, _StateData) ->
     ok = kds_keyring_initializer:cancel(),
     {keep_state_and_data, {reply, From, ok}};
-
 %% locked events
 
 handle_event({call, From}, start_unlock, locked, _StateData) ->
@@ -209,7 +203,6 @@ handle_event({call, From}, {confirm_unlock, ShareholderId, Share}, locked, State
 handle_event({call, From}, cancel_unlock, locked, _StateData) ->
     ok = kds_keyring_unlocker:cancel(),
     {keep_state_and_data, {reply, From, ok}};
-
 %% unlocked events
 
 handle_event({call, From}, lock, unlocked, #data{keyring = Keyring} = StateData) ->
@@ -219,8 +212,12 @@ handle_event({call, From}, get_keyring, unlocked, #data{keyring = Keyring}) ->
 handle_event({call, From}, start_rotate, unlocked, _StateData) ->
     Result = kds_keyring_rotator:initialize(),
     {keep_state_and_data, {reply, From, Result}};
-handle_event({call, From}, {confirm_rotate, ShareholderId, Share}, unlocked,
-    #data{keyring = OldKeyring} = StateData) ->
+handle_event(
+    {call, From},
+    {confirm_rotate, ShareholderId, Share},
+    unlocked,
+    #data{keyring = OldKeyring} = StateData
+) ->
     EncryptedKeyring = kds_keyring_storage:read(),
     case kds_keyring_rotator:confirm(ShareholderId, Share, EncryptedKeyring, OldKeyring) of
         {ok, {more, _More}} = Result ->
@@ -240,7 +237,7 @@ handle_event({call, From}, {start_rekey, Threshold}, unlocked, _StateData) ->
     {keep_state_and_data, {reply, From, Result}};
 handle_event({call, From}, {confirm_rekey, ShareholderId, Share}, unlocked, _StateData) ->
     EncryptedKeyring = kds_keyring_storage:read(),
-    Result =  kds_keyring_rekeyer:confirm(ShareholderId, Share, EncryptedKeyring),
+    Result = kds_keyring_rekeyer:confirm(ShareholderId, Share, EncryptedKeyring),
     {keep_state_and_data, {reply, From, Result}};
 handle_event({call, From}, start_validate_rekey, unlocked, #data{keyring = Keyring}) ->
     Result = kds_keyring_rekeyer:start_validation(Keyring),
@@ -258,15 +255,18 @@ handle_event({call, From}, {validate_rekey, ShareholderId, Share}, unlocked, #da
 handle_event({call, From}, cancel_rekey, unlocked, _StateData) ->
     ok = kds_keyring_rekeyer:cancel(),
     {keep_state_and_data, {reply, From, ok}};
-
 %% common events
 
 handle_event({call, From}, get_status, State, _Data) ->
     {keep_state_and_data, {reply, From, {ok, generate_status(State)}}};
 handle_event({call, From}, {update_meta, _UpdateKeyringMeta}, not_initialized, _StateData) ->
     {keep_state_and_data, {reply, From, {error, {invalid_status, not_initialized}}}};
-handle_event({call, From}, {update_meta, UpdateKeyringMeta}, _State,
-    #data{keyring = #{meta := KeyringMeta} = Keyring} = Data) ->
+handle_event(
+    {call, From},
+    {update_meta, UpdateKeyringMeta},
+    _State,
+    #data{keyring = #{meta := KeyringMeta} = Keyring} = Data
+) ->
     case kds_keyring_meta:update_meta(KeyringMeta, UpdateKeyringMeta) of
         KeyringMeta ->
             {keep_state_and_data, {reply, From, {ok, ok}}};

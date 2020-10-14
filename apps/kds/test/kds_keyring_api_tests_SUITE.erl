@@ -55,7 +55,6 @@ all() ->
     ].
 
 -spec groups() -> [{atom(), list(), [atom()]}].
-
 groups() ->
     [
         {all_groups, [], [
@@ -103,15 +102,14 @@ groups() ->
             rotate_wrong_masterkey
         ]}
     ].
+
 %%
 %% starting/stopping
 %%
 
 -spec init_per_group(atom(), config()) -> config().
-
 init_per_group(all_groups, C) ->
     C;
-
 init_per_group(_, C) ->
     C1 = kds_ct_utils:start_stash(C),
     C2 = kds_ct_utils:start_clear(C1),
@@ -129,12 +127,8 @@ init_per_group(_, C) ->
     ] ++ C2.
 
 -spec end_per_group(atom(), config()) -> _.
-
-end_per_group(Group, C) when
-    Group =:= all_groups
-    ->
+end_per_group(Group, C) when Group =:= all_groups ->
     C;
-
 end_per_group(_, C) ->
     kds_ct_utils:stop_clear(C).
 
@@ -143,7 +137,6 @@ end_per_group(_, C) ->
 %%
 
 -spec init(config()) -> _.
-
 init(C) ->
     Threshold = 2,
     EncryptedMasterKeyShares = kds_keyring_client:start_init(Threshold, root_url(C)),
@@ -151,7 +144,11 @@ init(C) ->
     _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
     SigPrivateKeys = sig_private_keys(C),
-    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(EncryptedMasterKeyShares, EncPrivateKeys, SigPrivateKeys),
+    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(
+        EncryptedMasterKeyShares,
+        EncPrivateKeys,
+        SigPrivateKeys
+    ),
     _ = ?assertMatch(
         #{
             status := not_initialized,
@@ -182,7 +179,6 @@ init(C) ->
     kds_ct_utils:store(master_key, MasterKey, C).
 
 -spec init_with_timeout(config()) -> _.
-
 init_with_timeout(C) ->
     {Id, DecryptedMasterKeyShare} = partial_init(C),
     Timeout = genlib_app:env(kds, keyring_rotation_lifetime, 4000),
@@ -193,7 +189,6 @@ init_with_timeout(C) ->
     ).
 
 -spec init_with_cancel(config()) -> _.
-
 init_with_cancel(C) ->
     {Id, DecryptedMasterKeyShare} = partial_init(C),
     ok = kds_keyring_client:cancel_init(root_url(C)),
@@ -226,7 +221,6 @@ partial_init(C) ->
     {Id, DecryptedMasterKeyShare}.
 
 -spec validate_init([{kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()}], config()) -> ok.
-
 validate_init([{Id, DecryptedMasterKeyShare} | []], C) ->
     _ = ?assertEqual(
         ok,
@@ -242,12 +236,10 @@ validate_init([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
     validate_init(DecryptedMasterKeyShares, C).
 
 -spec lock(config()) -> _.
-
 lock(C) ->
     ok = kds_keyring_client:lock(root_url(C)).
 
 -spec unlock(config()) -> _.
-
 unlock(C) ->
     _ = ?assertMatch(
         #{
@@ -282,12 +274,11 @@ unlock(C) ->
     #{activities := #{unlock := #{confirmation_shares := ConfirmationShares}}} = State,
     _ = ?assertMatch(
         #{Id1 := _},
-        maps:fold(fun (K, V, Acc) -> Acc#{V => K} end, #{}, ConfirmationShares)
+        maps:fold(fun(K, V, Acc) -> Acc#{V => K} end, #{}, ConfirmationShares)
     ),
     _ = ?assertEqual(ok, kds_keyring_client:confirm_unlock(Id2, MasterKey2, root_url(C))).
 
 -spec unlock_old_keyring(config()) -> _.
-
 unlock_old_keyring(C) ->
     MasterKey = kds_ct_utils:lookup(master_key, C),
     KeyringStorageOpts = application:get_env(kds, keyring_storage_opts, #{}),
@@ -298,7 +289,6 @@ unlock_old_keyring(C) ->
     _ = unlock(C).
 
 -spec unlock_with_timeout(config()) -> _.
-
 unlock_with_timeout(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(ok, kds_keyring_client:start_unlock(root_url(C))),
@@ -319,7 +309,6 @@ unlock_with_timeout(C) ->
     _ = ?assertEqual(ok, kds_keyring_client:confirm_unlock(Id2, MasterKey2, root_url(C))).
 
 -spec rekey(config()) -> _.
-
 rekey(C) ->
     _ = ?assertEqual(ok, kds_keyring_client:start_rekey(2, root_url(C))),
     _ = ?assertEqual(
@@ -360,18 +349,21 @@ rekey(C) ->
     #{activities := #{rekeying := #{confirmation_shares := ConfirmationShares}}} = State,
     _ = ?assertMatch(
         #{Id1 := _, Id2 := _},
-        maps:fold(fun (K, V, Acc) -> Acc#{V => K} end, #{}, ConfirmationShares)
+        maps:fold(fun(K, V, Acc) -> Acc#{V => K} end, #{}, ConfirmationShares)
     ),
     Shareholders = kds_shareholder:get_all(),
     _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
     SigPrivateKeys = sig_private_keys(C),
-    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(EncryptedMasterKeyShares, EncPrivateKeys, SigPrivateKeys),
+    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(
+        EncryptedMasterKeyShares,
+        EncPrivateKeys,
+        SigPrivateKeys
+    ),
     ok = validate_rekey(DecryptedMasterKeyShares, C),
     kds_ct_utils:store(master_keys, DecryptedMasterKeyShares, C).
 
 -spec rekey_with_timeout(config()) -> _.
-
 rekey_with_timeout(C) ->
     _ = ?assertEqual(ok, kds_keyring_client:start_rekey(2, root_url(C))),
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
@@ -399,12 +391,15 @@ rekey_with_timeout(C) ->
     _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
     SigPrivateKeys = sig_private_keys(C),
-    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(EncryptedMasterKeyShares, EncPrivateKeys, SigPrivateKeys),
+    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(
+        EncryptedMasterKeyShares,
+        EncPrivateKeys,
+        SigPrivateKeys
+    ),
     ok = validate_rekey(DecryptedMasterKeyShares, C),
     kds_ct_utils:store(master_keys, DecryptedMasterKeyShares, C).
 
 -spec rekey_with_cancel(config()) -> _.
-
 rekey_with_cancel(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(
@@ -427,12 +422,15 @@ rekey_with_cancel(C) ->
     _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
     SigPrivateKeys = sig_private_keys(C),
-    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(EncryptedMasterKeyShares, EncPrivateKeys, SigPrivateKeys),
+    DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(
+        EncryptedMasterKeyShares,
+        EncPrivateKeys,
+        SigPrivateKeys
+    ),
     ok = validate_rekey(DecryptedMasterKeyShares, C),
     kds_ct_utils:store(master_keys, DecryptedMasterKeyShares, C).
 
 -spec validate_rekey([{kds_shareholder:shareholder_id(), kds_keysharing:masterkey_share()}], config()) -> ok.
-
 validate_rekey([{Id, DecryptedMasterKeyShare} | []], C) ->
     _ = ?assertEqual(
         ok,
@@ -448,7 +446,6 @@ validate_rekey([{Id, DecryptedMasterKeyShare} | DecryptedMasterKeyShares], C) ->
     validate_rekey(DecryptedMasterKeyShares, C).
 
 -spec rotate(config()) -> _.
-
 rotate(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(
@@ -464,7 +461,6 @@ rotate(C) ->
     _ = ?assertEqual(ok, kds_keyring_client:confirm_rotate(Id2, MasterKey2, root_url(C))).
 
 -spec rotate_with_timeout(config()) -> _.
-
 rotate_with_timeout(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, {Id3, MasterKey3}] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(ok, kds_keyring_client:start_rotate(root_url(C))),
@@ -476,7 +472,6 @@ rotate_with_timeout(C) ->
     _ = ?assertEqual(ok, kds_keyring_client:confirm_rotate(Id3, MasterKey3, root_url(C))).
 
 -spec rotate_with_cancel(config()) -> _.
-
 rotate_with_cancel(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, {Id3, MasterKey3}] = kds_ct_utils:lookup(master_keys, C),
     _ = ?assertEqual(ok, kds_keyring_client:start_rotate(root_url(C))),
@@ -487,27 +482,24 @@ rotate_with_cancel(C) ->
     _ = ?assertEqual(ok, kds_keyring_client:confirm_rotate(Id3, MasterKey3, root_url(C))).
 
 -spec init_invalid_status(config()) -> _.
-
 init_invalid_status(C) ->
     _ = ?assertMatch(
-        {error, {invalid_status, _SomeStatus}},
+        {error, {invalid_status, _}},
         kds_keyring_client:start_init(2, root_url(C))
     ).
 
 -spec init_invalid_args(config()) -> _.
-
 init_invalid_args(C) ->
     _ = ?assertMatch(
-        {error, {invalid_arguments, _Reason}},
+        {error, {invalid_arguments, _}},
         kds_keyring_client:start_init(4, root_url(C))
     ),
     _ = ?assertMatch(
-        {error, {invalid_arguments, _Reason}},
+        {error, {invalid_arguments, _}},
         kds_keyring_client:start_init(0, root_url(C))
     ).
 
 -spec init_operation_aborted_failed_to_recover(config()) -> _.
-
 init_operation_aborted_failed_to_recover(C) ->
     MasterKey = kds_crypto:key(),
     [WrongShare1, WrongShare2, _WrongShare3] = kds_keysharing:share(MasterKey, 2, 3),
@@ -517,15 +509,22 @@ init_operation_aborted_failed_to_recover(C) ->
         maps:to_list(SigPrivateKeys),
 
     _ = kds_keyring_client:start_init(2, root_url(C)),
-    {more_keys_needed, 2} = kds_keyring_client:validate_init(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_init(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
+    {more_keys_needed, 2} = kds_keyring_client:validate_init(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_init(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"failed_to_recover">>}},
         kds_keyring_client:validate_init(Id3, kds_crypto:sign(SigPrivateKey3, InvalidShare), root_url(C))
     ).
 
 -spec init_operation_aborted_failed_to_decrypt(config()) -> _.
-
 init_operation_aborted_failed_to_decrypt(C) ->
     MasterKey = kds_crypto:key(),
     [WrongShare1, WrongShare2, WrongShare3] = kds_keysharing:share(MasterKey, 2, 3),
@@ -534,15 +533,22 @@ init_operation_aborted_failed_to_decrypt(C) ->
         maps:to_list(SigPrivateKeys),
 
     _ = kds_keyring_client:start_init(2, root_url(C)),
-    {more_keys_needed, 2} = kds_keyring_client:validate_init(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_init(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
+    {more_keys_needed, 2} = kds_keyring_client:validate_init(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_init(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"failed_to_decrypt_keyring">>}},
         kds_keyring_client:validate_init(Id3, kds_crypto:sign(SigPrivateKey3, WrongShare3), root_url(C))
     ).
 
 -spec init_operation_aborted_non_matching_mk(config()) -> _.
-
 init_operation_aborted_non_matching_mk(C) ->
     MasterKey = kds_crypto:key(),
     [WrongShare1, WrongShare2, _WrongShare3] = kds_keysharing:share(MasterKey, 1, 3),
@@ -553,15 +559,22 @@ init_operation_aborted_non_matching_mk(C) ->
         maps:to_list(SigPrivateKeys),
 
     _ = kds_keyring_client:start_init(1, root_url(C)),
-    {more_keys_needed, 2} = kds_keyring_client:validate_init(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_init(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
+    {more_keys_needed, 2} = kds_keyring_client:validate_init(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_init(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"non_matching_masterkey">>}},
         kds_keyring_client:validate_init(Id3, kds_crypto:sign(SigPrivateKey3, WrongShare6), root_url(C))
     ).
 
 -spec rekey_operation_aborted_wrong_masterkey(config()) -> _.
-
 rekey_operation_aborted_wrong_masterkey(C) ->
     MasterKey = kds_crypto:key(),
     [WrongShare1, WrongShare2, _WrongShare3] = kds_keysharing:share(MasterKey, 2, 3),
@@ -570,15 +583,22 @@ rekey_operation_aborted_wrong_masterkey(C) ->
         maps:to_list(SigPrivateKeys),
 
     ok = kds_keyring_client:start_rekey(2, root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
+    {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"wrong_masterkey">>}},
         kds_keyring_client:confirm_rekey(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C))
     ).
 
 -spec rekey_operation_aborted_failed_to_recover_confirm(config()) -> _.
-
 rekey_operation_aborted_failed_to_recover_confirm(C) ->
     MasterKey = kds_crypto:key(),
     [WrongShare1, _WrongShare2, _WrongShare3] = kds_keysharing:share(MasterKey, 2, 3),
@@ -588,14 +608,17 @@ rekey_operation_aborted_failed_to_recover_confirm(C) ->
         maps:to_list(SigPrivateKeys),
 
     ok = kds_keyring_client:start_rekey(2, root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
+    {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"failed_to_recover">>}},
         kds_keyring_client:confirm_rekey(Id2, kds_crypto:sign(SigPrivateKey2, InvalidShare), root_url(C))
     ).
 
 -spec rekey_operation_aborted_failed_to_recover_validate(config()) -> _.
-
 rekey_operation_aborted_failed_to_recover_validate(C) ->
     [{Id1, TrueSignedShare1}, {Id2, TrueSignedShare2}, {Id3, _TrueSignedShare3}] = kds_ct_utils:lookup(master_keys, C),
     SigPrivateKeys = sig_private_keys(C),
@@ -608,16 +631,27 @@ rekey_operation_aborted_failed_to_recover_validate(C) ->
     {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(Id1, TrueSignedShare1, root_url(C)),
     ok = kds_keyring_client:confirm_rekey(Id2, TrueSignedShare2, root_url(C)),
     _ = kds_keyring_client:start_rekey_validation(root_url(C)),
-    {more_keys_needed, 2} = kds_keyring_client:validate_rekey(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
+    {more_keys_needed, 2} = kds_keyring_client:validate_rekey(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"failed_to_recover">>}},
         kds_keyring_client:validate_rekey(Id3, kds_crypto:sign(SigPrivateKey3, InvalidShare), root_url(C))
     ).
 
 -spec rekey_operation_aborted_failed_to_decrypt_keyring(config()) -> _.
-
 rekey_operation_aborted_failed_to_decrypt_keyring(C) ->
     [{Id1, TrueSignedShare1}, {Id2, TrueSignedShare2}, {Id3, _TrueSignedShare3}] = kds_ct_utils:lookup(master_keys, C),
     SigPrivateKeys = sig_private_keys(C),
@@ -629,16 +663,22 @@ rekey_operation_aborted_failed_to_decrypt_keyring(C) ->
     {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(Id1, TrueSignedShare1, root_url(C)),
     ok = kds_keyring_client:confirm_rekey(Id2, TrueSignedShare2, root_url(C)),
     _ = kds_keyring_client:start_rekey_validation(root_url(C)),
-    {more_keys_needed, 2} = kds_keyring_client:validate_rekey(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
+    {more_keys_needed, 2} = kds_keyring_client:validate_rekey(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"failed_to_decrypt_keyring">>}},
         kds_keyring_client:validate_rekey(Id3, kds_crypto:sign(SigPrivateKey3, WrongShare3), root_url(C))
     ).
 
-
 -spec rekey_operation_aborted_non_matching_masterkey(config()) -> _.
-
 rekey_operation_aborted_non_matching_masterkey(C) ->
     [{Id1, TrueSignedShare1}, {Id2, TrueSignedShare2}, {Id3, _TrueSignedShare3}] = kds_ct_utils:lookup(master_keys, C),
     SigPrivateKeys = sig_private_keys(C),
@@ -652,51 +692,54 @@ rekey_operation_aborted_non_matching_masterkey(C) ->
     {more_keys_needed, 1} = kds_keyring_client:confirm_rekey(Id1, TrueSignedShare1, root_url(C)),
     ok = kds_keyring_client:confirm_rekey(Id2, TrueSignedShare2, root_url(C)),
     _ = kds_keyring_client:start_rekey_validation(root_url(C)),
-    {more_keys_needed, 2} = kds_keyring_client:validate_rekey(Id1, kds_crypto:sign(SigPrivateKey1, WrongShare1), root_url(C)),
-    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(Id2, kds_crypto:sign(SigPrivateKey2, WrongShare2), root_url(C)),
+    {more_keys_needed, 2} = kds_keyring_client:validate_rekey(
+        Id1,
+        kds_crypto:sign(SigPrivateKey1, WrongShare1),
+        root_url(C)
+    ),
+    {more_keys_needed, 1} = kds_keyring_client:validate_rekey(
+        Id2,
+        kds_crypto:sign(SigPrivateKey2, WrongShare2),
+        root_url(C)
+    ),
     _ = ?assertEqual(
         {error, {operation_aborted, <<"non_matching_masterkey">>}},
         kds_keyring_client:validate_rekey(Id3, kds_crypto:sign(SigPrivateKey3, WrongShare6), root_url(C))
     ).
 
 -spec rekey_invalid_args(config()) -> _.
-
 rekey_invalid_args(C) ->
     _ = ?assertMatch(
-        {error, {invalid_arguments, _Reason}},
+        {error, {invalid_arguments, _}},
         kds_keyring_client:start_rekey(4, root_url(C))
     ),
     _ = ?assertMatch(
-        {error, {invalid_arguments, _Reason}},
+        {error, {invalid_arguments, _}},
         kds_keyring_client:start_rekey(0, root_url(C))
     ).
 
 -spec rekey_invalid_status(config()) -> _.
-
 rekey_invalid_status(C) ->
     _ = ?assertMatch(
-        {error, {invalid_status, _SomeStatus}},
+        {error, {invalid_status, _}},
         kds_keyring_client:start_rekey(2, root_url(C))
     ).
 
 -spec lock_invalid_status(config()) -> _.
-
 lock_invalid_status(C) ->
     _ = ?assertMatch(
-        {error, {invalid_status, _SomeStatus}},
+        {error, {invalid_status, _}},
         kds_keyring_client:lock(root_url(C))
     ).
 
 -spec rotate_invalid_status(config()) -> _.
-
 rotate_invalid_status(C) ->
     _ = ?assertMatch(
-        {error, {invalid_status, _SomeStatus}},
+        {error, {invalid_status, _}},
         kds_keyring_client:start_rotate(root_url(C))
     ).
 
 -spec rotate_failed_to_recover(config()) -> _.
-
 rotate_failed_to_recover(C) ->
     [{Id1, MasterKey1}, {Id2, _MasterKey2} | _MasterKeys] = kds_ct_utils:lookup(master_keys, C),
     MasterKey2 = kds_keysharing:encode_share(#share{threshold = 2, x = 4, y = <<23224>>}),
@@ -724,7 +767,6 @@ rotate_failed_to_recover(C) ->
     ).
 
 -spec rotate_wrong_masterkey(config()) -> _.
-
 rotate_wrong_masterkey(C) ->
     MasterKey = kds_crypto:key(),
     [MasterKey1, MasterKey2, _MasterKey3] = kds_keysharing:share(MasterKey, 2, 3),
@@ -746,7 +788,6 @@ rotate_wrong_masterkey(C) ->
 %%
 %% helpers
 %%
-
 
 config(Key, Config) ->
     config(Key, Config, undefined).

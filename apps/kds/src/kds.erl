@@ -1,31 +1,29 @@
 -module(kds).
+
 -behaviour(supervisor).
 -behaviour(application).
 
 %% API
 -export([start/0]).
--export([stop /0]).
+-export([stop/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
 %% Application callbacks
 -export([start/2]).
--export([stop /1]).
+-export([stop/1]).
 
 %%
 %% API
 %%
--spec start() ->
-    {ok, _}.
+-spec start() -> {ok, _}.
 start() ->
     application:ensure_all_started(kds).
 
--spec stop() ->
-    ok.
+-spec stop() -> ok.
 stop() ->
     application:stop(kds).
-
 
 %%
 %% Supervisor callbacks
@@ -42,12 +40,12 @@ init([]) ->
             handlers => [
                 kds_thrift_services:http_handler(keyring_management)
             ],
-            event_handler     => kds_woody_event_handler,
-            ip                => IP,
-            port              => genlib_app:env(?MODULE, management_port, 8022),
-            transport_opts    => genlib_app:env(?MODULE, management_transport_opts, #{}),
-            protocol_opts     => genlib_app:env(?MODULE, protocol_opts, #{}),
-            shutdown_timeout  => genlib_app:env(?MODULE, shutdown_timeout, 0),
+            event_handler => kds_woody_event_handler,
+            ip => IP,
+            port => genlib_app:env(?MODULE, management_port, 8022),
+            transport_opts => genlib_app:env(?MODULE, management_transport_opts, #{}),
+            protocol_opts => genlib_app:env(?MODULE, protocol_opts, #{}),
+            shutdown_timeout => genlib_app:env(?MODULE, shutdown_timeout, 0),
             additional_routes => [HealthRoute]
         }
     ),
@@ -57,12 +55,12 @@ init([]) ->
             handlers => [
                 kds_thrift_services:http_handler(keyring_storage)
             ],
-            event_handler     => kds_woody_event_handler,
-            ip                => IP,
-            port              => genlib_app:env(?MODULE, storage_port, 8023),
-            transport_opts    => genlib_app:env(?MODULE, storage_transport_opts, #{}),
-            protocol_opts     => genlib_app:env(?MODULE, protocol_opts, #{}),
-            shutdown_timeout  => genlib_app:env(?MODULE, shutdown_timeout, 0),
+            event_handler => kds_woody_event_handler,
+            ip => IP,
+            port => genlib_app:env(?MODULE, storage_port, 8023),
+            transport_opts => genlib_app:env(?MODULE, storage_transport_opts, #{}),
+            protocol_opts => genlib_app:env(?MODULE, protocol_opts, #{}),
+            shutdown_timeout => genlib_app:env(?MODULE, shutdown_timeout, 0),
             additional_routes => [HealthRoute]
         }
     ),
@@ -84,18 +82,15 @@ init([]) ->
 -spec enable_health_logging(erl_health:check()) -> erl_health:check().
 enable_health_logging(Check) ->
     EvHandler = {erl_health_event_handler, []},
-    maps:map(fun (_, V = {_, _, _}) -> #{runner => V, event_handler => EvHandler} end, Check).
-
+    maps:map(fun(_, V = {_, _, _}) -> #{runner => V, event_handler => EvHandler} end, Check).
 
 %%
 %% Application callbacks
 %%
--spec start(normal, any()) ->
-    {ok, pid()} | {error, any()}.
+-spec start(normal, any()) -> {ok, pid()} | {error, any()}.
 start(normal, _StartArgs) ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
--spec stop(any()) ->
-    ok.
+-spec stop(any()) -> ok.
 stop(_State) ->
     ok.

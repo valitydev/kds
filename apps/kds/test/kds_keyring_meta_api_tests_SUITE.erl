@@ -26,7 +26,6 @@ all() ->
     ].
 
 -spec groups() -> [{atom(), list(), [atom()]}].
-
 groups() ->
     [
         {basic_lifecycle, [sequence], [
@@ -42,7 +41,6 @@ groups() ->
 %%
 
 -spec init_per_group(atom(), config()) -> config().
-
 init_per_group(_, C) ->
     C1 = kds_ct_utils:start_stash(C),
     C2 = kds_ct_utils:start_clear(C1),
@@ -60,12 +58,10 @@ init_per_group(_, C) ->
     ] ++ C2.
 
 -spec end_per_group(atom(), config()) -> _.
-
 end_per_group(_, C) ->
     kds_ct_utils:stop_clear(C).
 
 -spec init_check_meta(config()) -> _.
-
 init_check_meta(C) ->
     _ = ?assertMatch(
         #{keys := #{}, current_key_id := 0},
@@ -75,7 +71,8 @@ init_check_meta(C) ->
         {error, {invalid_status, not_initialized}},
         kds_keyring_client:update_keyring_meta(
             #{keys => #{0 => #{retired => true}}},
-            root_url(C))
+            root_url(C)
+        )
     ),
     _ = ?assertMatch(
         #{keys := #{}, current_key_id := 0},
@@ -88,21 +85,22 @@ init_check_meta(C) ->
     ).
 
 -spec rotate_check_meta(config()) -> _.
-
 rotate_check_meta(C) ->
     _ = ?assertMatch(
-        #{keys := #{
-            0 := #{
-                retired := false,
-                security_parameters := #{
-                    deduplication_hash_opts := #{
-                        n := 16384,
-                        r := 8,
-                        p := 1
+        #{
+            keys := #{
+                0 := #{
+                    retired := false,
+                    security_parameters := #{
+                        deduplication_hash_opts := #{
+                            n := 16384,
+                            r := 8,
+                            p := 1
+                        }
                     }
                 }
             }
-        }},
+        },
         kds_keyring_client:get_keyring_meta(root_url(C))
     ),
     ok = application:set_env(kds, new_key_security_parameters, #{
@@ -114,33 +112,34 @@ rotate_check_meta(C) ->
     }),
     _ = kds_ct_keyring:rotate(C),
     _ = ?assertMatch(
-        #{keys := #{
-            0 := #{
-                retired := false,
-                security_parameters := #{
-                    deduplication_hash_opts := #{
-                        n := 16384,
-                        r := 8,
-                        p := 1
+        #{
+            keys := #{
+                0 := #{
+                    retired := false,
+                    security_parameters := #{
+                        deduplication_hash_opts := #{
+                            n := 16384,
+                            r := 8,
+                            p := 1
+                        }
                     }
-                }
-            },
-            1 := #{
-                retired := false,
-                security_parameters := #{
-                    deduplication_hash_opts := #{
-                        n := 16384,
-                        r := 7,
-                        p := 1
+                },
+                1 := #{
+                    retired := false,
+                    security_parameters := #{
+                        deduplication_hash_opts := #{
+                            n := 16384,
+                            r := 7,
+                            p := 1
+                        }
                     }
                 }
             }
-        }},
+        },
         kds_keyring_client:get_keyring_meta(root_url(C))
     ).
 
 -spec update_meta(config()) -> _.
-
 update_meta(C) ->
     _ = ?assertMatch(
         #{
@@ -154,10 +153,12 @@ update_meta(C) ->
     ),
     ok = kds_keyring_client:update_keyring_meta(
         #{keys => #{0 => #{retired => true}}},
-        root_url(C)),
+        root_url(C)
+    ),
     ok = kds_keyring_client:update_keyring_meta(
         #{keys => #{0 => #{retired => true}}},
-        root_url(C)),
+        root_url(C)
+    ),
     _ = ?assertMatch(
         #{
             current_key_id := 0,
@@ -170,7 +171,8 @@ update_meta(C) ->
     ),
     ok = kds_keyring_client:update_keyring_meta(
         #{current_key_id => 1},
-        root_url(C)),
+        root_url(C)
+    ),
     _ = ?assertMatch(
         #{
             current_key_id := 1,
@@ -180,11 +182,9 @@ update_meta(C) ->
             }
         },
         kds_keyring_client:get_keyring_meta(root_url(C))
-    )
-.
+    ).
 
 -spec rotate_collision_check(config()) -> _.
-
 rotate_collision_check(C) ->
     [{Id1, MasterKey1}, {Id2, MasterKey2}, _MasterKey3] = kds_ct_utils:lookup(master_keys, C),
     ok = kds_keyring_client:start_rotate(root_url(C)),
@@ -195,12 +195,14 @@ rotate_collision_check(C) ->
             keys := #{
                 0 := #{retired := true},
                 1 := #{retired := false}
-            }},
+            }
+        },
         kds_keyring_client:get_keyring_meta(root_url(C))
     ),
     ok = kds_keyring_client:update_keyring_meta(
         #{keys => #{0 => #{retired => false}}},
-        root_url(C)),
+        root_url(C)
+    ),
     ok = kds_keyring_client:confirm_rotate(Id2, MasterKey2, root_url(C)),
     _ = ?assertMatch(
         #{
@@ -209,7 +211,8 @@ rotate_collision_check(C) ->
                 0 := #{retired := false},
                 1 := #{retired := false},
                 2 := #{retired := false}
-            }},
+            }
+        },
         kds_keyring_client:get_keyring_meta(root_url(C))
     ).
 

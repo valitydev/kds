@@ -5,6 +5,7 @@
 -export([get_by_id/1]).
 -export([get_public_key/2]).
 -export([get_public_key_by_id/2]).
+
 -export_type([shareholder_id/0]).
 -export_type([shareholder/0]).
 -export_type([shareholders/0]).
@@ -19,15 +20,19 @@
         public_key_type() => public_key()
     }
 }.
+
 -type shareholders() :: list(shareholder()).
 
 -spec get_all() -> shareholders().
 get_all() ->
     Shareholders = genlib_app:env(kds, shareholders, #{}),
     MergedShareholders = maps:fold(
-        fun (ShareholderId, Shareholder, Acc) ->
+        fun(ShareholderId, Shareholder, Acc) ->
             [convert_to_map(ShareholderId, Shareholder) | Acc]
-        end, [], Shareholders),
+        end,
+        [],
+        Shareholders
+    ),
     case validate_shareholders(MergedShareholders) of
         true ->
             MergedShareholders;
@@ -52,7 +57,6 @@ get_by_id(Id) ->
     end.
 
 -spec validate_shareholders(shareholders()) -> boolean().
-
 validate_shareholders(Shareholders) ->
     lists:all(
         fun(Shareholder) ->
@@ -69,10 +73,14 @@ validate_shareholders(Shareholders) ->
                 _InvalidShareholder ->
                     false
             end
-        end, Shareholders).
+        end,
+        Shareholders
+    ).
 
--spec convert_to_map(shareholder_id(),
-    #{owner := binary(), public_keys:= #{enc := binary(), sig := binary()}}) -> shareholder().
+-spec convert_to_map(
+    shareholder_id(),
+    #{owner := binary(), public_keys := #{enc := binary(), sig := binary()}}
+) -> shareholder().
 convert_to_map(Id, #{public_keys := #{enc := EncPublicKey, sig := SigPublicKey}} = Shareholder) ->
     Shareholder#{
         id => Id,

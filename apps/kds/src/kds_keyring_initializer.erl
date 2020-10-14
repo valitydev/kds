@@ -12,6 +12,7 @@
 -export([get_status/0]).
 -export([cancel/0]).
 -export([handle_event/4]).
+
 -export_type([encrypted_master_key_shares/0]).
 -export_type([status/0]).
 -export_type([state/0]).
@@ -48,41 +49,35 @@
 
 -type threshold() :: kds_keysharing:threshold().
 
--type validate_errors() :: {operation_aborted,
-    non_matching_masterkey | failed_to_decrypt_keyring | failed_to_recover}.
+-type validate_errors() :: {operation_aborted, non_matching_masterkey | failed_to_decrypt_keyring | failed_to_recover}.
 -type initialize_errors() :: invalid_args.
 -type invalid_activity() :: {error, {invalid_activity, {initialization, state()}}}.
 
 -spec callback_mode() -> handle_event_function.
-
 callback_mode() -> handle_event_function.
 
 -spec start_link() -> {ok, pid()}.
-
 start_link() ->
     gen_statem:start_link({local, ?STATEM}, ?MODULE, [], []).
 
 -spec initialize(threshold()) ->
     {ok, encrypted_master_key_shares()} | {error, initialize_errors()} | invalid_activity().
-
 initialize(Threshold) ->
     call({initialize, Threshold}).
 
 -spec validate(shareholder_id(), masterkey_share()) ->
-    {ok, {more, pos_integer()}} |
-    {ok, {done, {encrypted_keyring(), decrypted_keyring()}}} |
-    {error, validate_errors()} | invalid_activity().
-
+    {ok, {more, pos_integer()}}
+    | {ok, {done, {encrypted_keyring(), decrypted_keyring()}}}
+    | {error, validate_errors()}
+    | invalid_activity().
 validate(ShareholderId, Share) ->
     call({validate, ShareholderId, Share}).
 
 -spec cancel() -> ok.
-
 cancel() ->
     call(cancel).
 
 -spec get_status() -> status().
-
 get_status() ->
     call(get_status).
 
@@ -90,13 +85,10 @@ call(Message) ->
     gen_statem:call(?STATEM, Message).
 
 -spec init(term()) -> {ok, state(), data()}.
-
 init([]) ->
     {ok, uninitialized, #data{}}.
 
--spec handle_event(gen_statem:event_type(), term(), state(), data()) ->
-    gen_statem:event_handler_result(state()).
-
+-spec handle_event(gen_statem:event_type(), term(), state(), data()) -> gen_statem:event_handler_result(state()).
 %% Successful workflow events
 
 handle_event({call, From}, {initialize, Threshold}, uninitialized, _Data) ->
@@ -114,35 +106,30 @@ handle_event({call, From}, {initialize, Threshold}, uninitialized, _Data) ->
                 num = length(EncryptedShares),
                 threshold = Threshold,
                 keyring = EncryptedKeyring,
-                timer = TimerRef},
+                timer = TimerRef
+            },
             _ = logger:info("kds_keyring_initializer changed state to validation"),
-            {next_state,
-                validation,
-                NewData,
-                {reply, From, {ok, EncryptedShares}}};
+            {next_state, validation, NewData, {reply, From, {ok, EncryptedShares}}};
         false ->
             {next_state, uninitialized, #data{}, {reply, From, {error, invalid_args}}}
     end;
-handle_event({call, From}, {validate, ShareholderId, Share}, validation,
-    #data{num = Num, threshold = Threshold, shares = Shares, keyring = Keyring, timer = TimerRef} = Data) ->
+handle_event(
+    {call, From},
+    {validate, ShareholderId, Share},
+    validation,
+    #data{num = Num, threshold = Threshold, shares = Shares, keyring = Keyring, timer = TimerRef} = Data
+) ->
     #share{x = X} = kds_keysharing:decode_share(Share),
     case Shares#{X => {ShareholderId, Share}} of
         AllShares when map_size(AllShares) =:= Num ->
             _ = erlang:cancel_timer(TimerRef),
             Result = validate(Threshold, AllShares, Keyring),
             _ = logger:info("kds_keyring_initializer changed state to uninitialized"),
-            {next_state,
-                uninitialized,
-                #data{shares = kds_keysharing:clear_shares(Shares)},
-                {reply, From, Result}};
+            {next_state, uninitialized, #data{shares = kds_keysharing:clear_shares(Shares)}, {reply, From, Result}};
         Shares1 ->
             NewData = Data#data{shares = Shares1},
-            {next_state,
-                validation,
-                NewData,
-                {reply, From, {ok, {more, Num - maps:size(Shares1)}}}}
+            {next_state, validation, NewData, {reply, From, {ok, {more, Num - maps:size(Shares1)}}}}
     end;
-
 %% Common events
 
 handle_event({call, From}, get_state, State, _Data) ->
@@ -165,7 +152,6 @@ handle_event({call, From}, cancel, _State, #data{timer = TimerRef}) ->
 handle_event(info, {timeout, _TimerRef, lifetime_expired}, _State, _Data) ->
     _ = logger:info("kds_keyring_initializer changed state to uninitialized"),
     {next_state, uninitialized, #data{}, []};
-
 %% InvalidActivity events
 
 handle_event({call, From}, _Event, uninitialized, _Data) ->
@@ -178,12 +164,10 @@ handle_event({call, From}, _Event, validation, _Data) ->
     ]}.
 
 -spec get_timeout() -> non_neg_integer().
-
 get_timeout() ->
     genlib_app:env(kds, keyring_initialize_lifetime, 3 * 60 * 1000).
 
 -spec get_lifetime(reference() | undefined) -> seconds() | undefined.
-
 get_lifetime(TimerRef) ->
     case TimerRef of
         undefined ->
@@ -194,7 +178,6 @@ get_lifetime(TimerRef) ->
 
 -spec validate(threshold(), masterkey_shares_map(), encrypted_keyring()) ->
     {ok, {done, {encrypted_keyring(), decrypted_keyring()}}} | {error, validate_errors()}.
-
 validate(Threshold, Shares, EncryptedKeyring) ->
     ListShares = kds_keysharing:get_shares(Shares),
     case kds_keysharing:validate_shares(Threshold, ListShares) of

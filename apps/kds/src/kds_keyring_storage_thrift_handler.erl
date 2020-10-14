@@ -1,4 +1,5 @@
 -module(kds_keyring_storage_thrift_handler).
+
 -behaviour(woody_server_thrift_handler).
 
 -include_lib("cds_proto/include/cds_proto_keyring_thrift.hrl").
@@ -12,7 +13,6 @@
 
 -spec handle_function(woody:func(), woody:args(), woody_context:ctx(), woody:options()) ->
     {ok, woody:result()} | no_return().
-
 handle_function(OperationID, Args, Context, Opts) ->
     scoper:scope(
         keyring_storage,
@@ -55,15 +55,19 @@ encode_keys(Keys, KeysMeta) ->
                 retired := Retired,
                 security_parameters := SecurityParameters
             } = maps:get(K, KeysMeta),
-            Acc#{K => #cds_Key{
-                data = V,
-                meta = #cds_KeyMeta{
-                    retired = Retired,
-                    security_parameters = kds_keyring_meta:encode_security_parameters(SecurityParameters)
+            Acc#{
+                K => #cds_Key{
+                    data = V,
+                    meta = #cds_KeyMeta{
+                        retired = Retired,
+                        security_parameters = kds_keyring_meta:encode_security_parameters(SecurityParameters)
+                    }
                 }
-            }}
+            }
         end,
-        #{}, Keys).
+        #{},
+        Keys
+    ).
 
 -spec raise(_) -> no_return().
 raise(Exception) ->

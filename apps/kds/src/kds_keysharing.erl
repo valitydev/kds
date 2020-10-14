@@ -46,50 +46,56 @@
     owner := binary(),
     encrypted_share := binary()
 }.
+
 -type encrypted_master_key_shares() :: list(encrypted_master_key_share()).
 
 -spec share(binary(), byte(), byte()) -> [masterkey_share()].
 share(Secret, Threshold, Count) ->
     try
         [encode_share(Share) || Share <- shamir:share(Secret, Threshold, Count)]
-    catch error:Reason:Stacktrace -> %% FIXME can't catch exact errors because shamir doesn't process them itself
-        _ = logger:error("keysharing failed with ~p", [Reason],
-            #{stacktrace => genlib_format:format_stacktrace(Stacktrace)}),
-        throw(keysharing_failed)
+    catch
+        %% FIXME can't catch exact errors because shamir doesn't process them itself
+        error:Reason:Stacktrace ->
+            _ = logger:error(
+                "keysharing failed with ~p",
+                [Reason],
+                #{stacktrace => genlib_format:format_stacktrace(Stacktrace)}
+            ),
+            throw(keysharing_failed)
     end.
 
 -spec recover([masterkey_share()] | #{integer() => masterkey_share()}) ->
     {ok, masterkey()} | {error, failed_to_recover}.
-
 recover(Shares) when is_map(Shares) ->
     recover(maps:values(Shares));
 recover(Shares) ->
     try
         {ok, shamir:recover([decode_share(Share) || Share <- Shares])}
-    catch error:Reason:Stacktrace -> %% FIXME can't catch exact errors because shamir doesn't process them itself
-        _ = logger:error("keysharing recover failed ~p", [Reason],
-            #{stacktrace => genlib_format:format_stacktrace(Stacktrace)}),
-        {error, failed_to_recover}
+    catch
+        %% FIXME can't catch exact errors because shamir doesn't process them itself
+        error:Reason:Stacktrace ->
+            _ = logger:error(
+                "keysharing recover failed ~p",
+                [Reason],
+                #{stacktrace => genlib_format:format_stacktrace(Stacktrace)}
+            ),
+            {error, failed_to_recover}
     end.
 
--spec encode_share
-    (share()) -> masterkey_share().
+-spec encode_share(share()) -> masterkey_share().
 encode_share(#share{threshold = Threshold, x = X, y = Y}) ->
     base64:encode(<<Threshold, X, Y/binary>>).
 
--spec decode_share
-    (masterkey_share()) -> share().
+-spec decode_share(masterkey_share()) -> share().
 decode_share(Share) when is_binary(Share) ->
     <<Threshold, X, Y/binary>> = base64:decode(Share),
     #share{threshold = Threshold, x = X, y = Y}.
 
 -spec encrypt_shares_for_shareholders(masterkey_shares(), shareholders()) -> encrypted_master_key_shares().
-
 encrypt_shares_for_shareholders(Shares, Shareholders) ->
     lists:map(fun encrypt_share_for_shareholder/1, lists:zip(Shares, Shareholders)).
 
 -spec encrypt_share_for_shareholder({masterkey_share(), shareholder()}) -> encrypted_master_key_share().
-
 encrypt_share_for_shareholder({Share, #{id := Id, owner := Owner} = Shareholder}) ->
     PublicKey = kds_shareholder:get_public_key(Shareholder, enc),
     #{
@@ -99,35 +105,29 @@ encrypt_share_for_shareholder({Share, #{id := Id, owner := Owner} = Shareholder}
     }.
 
 -spec get_shares(masterkey_shares_map()) -> masterkey_shares().
-
 get_shares(Shares) ->
-    lists:map(fun ({_ShareholderId, Share}) -> Share end, maps:values(Shares)).
+    lists:map(fun({_ShareholderId, Share}) -> Share end, maps:values(Shares)).
 
 -spec get_shareholder_ids(masterkey_shares_map()) -> [shareholder_id()].
-
 get_shareholder_ids(Shares) ->
-    lists:map(fun ({ShareholderId, _Share}) -> ShareholderId end, maps:values(Shares)).
+    lists:map(fun({ShareholderId, _Share}) -> ShareholderId end, maps:values(Shares)).
 
 -spec get_id_map(masterkey_shares_map()) -> #{share_id() => shareholder_id()}.
-
 get_id_map(Shares) ->
-    maps:map(fun (_K, {ShareholderId, _Share}) -> ShareholderId end, Shares).
+    maps:map(fun(_K, {ShareholderId, _Share}) -> ShareholderId end, Shares).
 
 -spec clear_shares(masterkey_shares_map()) -> masterkey_shares_map().
-
 clear_shares(Shares) ->
-    maps:map(fun (_K, {ShareholderId, _Share}) -> {ShareholderId, <<>>} end, Shares).
+    maps:map(fun(_K, {ShareholderId, _Share}) -> {ShareholderId, <<>>} end, Shares).
 
 -spec validate_shares(threshold(), masterkey_shares()) ->
     {ok, masterkey()} | {error, non_matching_masterkey | failed_to_recover}.
-
 validate_shares(Threshold, Shares) ->
     AllSharesCombos = lib_combin:cnr(Threshold, Shares),
     validate_share_combos(AllSharesCombos).
 
 -spec validate_share_combos([masterkey_shares(), ...]) ->
     {ok, masterkey()} | {error, non_matching_masterkey | failed_to_recover}.
-
 validate_share_combos([FirstCombo | CombosOfShares]) ->
     lists:foldl(
         fun

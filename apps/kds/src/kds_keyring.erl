@@ -27,6 +27,7 @@
     data := binary(),
     meta := keyring_meta() | undefined
 }.
+
 -type keyring_meta() :: kds_keyring_meta:keyring_meta().
 
 -type keyring() :: #{
@@ -160,8 +161,7 @@ unmarshall_keys(<<>>, Acc) ->
 unmarshall_keys(<<KeyId, Key:?KEY_BYTESIZE/binary, Rest/binary>>, Acc) ->
     unmarshall_keys(Rest, Acc#{KeyId => Key}).
 
--spec validate_masterkey(masterkey(), keyring(), encrypted_keyring()) ->
-    {ok, keyring()} | {error, wrong_masterkey}.
+-spec validate_masterkey(masterkey(), keyring(), encrypted_keyring()) -> {ok, keyring()} | {error, wrong_masterkey}.
 validate_masterkey(MasterKey, Keyring, EncryptedOldKeyring) ->
     case decrypt(MasterKey, EncryptedOldKeyring) of
         {ok, Keyring} ->
@@ -172,8 +172,7 @@ validate_masterkey(MasterKey, Keyring, EncryptedOldKeyring) ->
             {error, wrong_masterkey}
     end.
 
--spec validate_masterkey(masterkey(), encrypted_keyring()) ->
-    {ok, keyring()} | {error, wrong_masterkey}.
+-spec validate_masterkey(masterkey(), encrypted_keyring()) -> {ok, keyring()} | {error, wrong_masterkey}.
 validate_masterkey(MasterKey, EncryptedOldKeyring) ->
     case decrypt(MasterKey, EncryptedOldKeyring) of
         {ok, Keyring} ->

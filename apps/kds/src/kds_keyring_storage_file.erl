@@ -1,4 +1,5 @@
 -module(kds_keyring_storage_file).
+
 -behaviour(kds_keyring_storage).
 -behaviour(gen_server).
 
@@ -17,6 +18,7 @@
 -record(state, {
     keyring_path :: string()
 }).
+
 -type state() :: #state{}.
 
 -spec child_spec(map()) -> {ok, supervisor:child_spec()}.
@@ -53,31 +55,34 @@ init(KeyringPath) ->
 
 -spec handle_call(term(), term(), state()) -> {reply, term(), state()}.
 handle_call({create, Keyring}, _From, #state{keyring_path = KeyringPath} = State) ->
-    Reply = case filelib:is_regular(KeyringPath) of
-        false ->
-            KeyringWithFormat = Keyring#{
-                format_version => ?FORMAT_VERSION
-            },
-            ok = filelib:ensure_dir(KeyringPath),
-            ok = atomic_write(KeyringPath, jsx:encode(KeyringWithFormat));
-        true ->
-            {error, already_exists}
-    end,
+    Reply =
+        case filelib:is_regular(KeyringPath) of
+            false ->
+                KeyringWithFormat = Keyring#{
+                    format_version => ?FORMAT_VERSION
+                },
+                ok = filelib:ensure_dir(KeyringPath),
+                ok = atomic_write(KeyringPath, jsx:encode(KeyringWithFormat));
+            true ->
+                {error, already_exists}
+        end,
     {reply, Reply, State};
 handle_call(read, _From, #state{keyring_path = KeyringPath} = State) ->
-    Reply = case file:read_file(KeyringPath) of
-        {ok, Data} ->
-            case jsx:is_json(Data) of
-                true ->
-                    DecodedData = decode_encrypted_keyring(
-                        jsx:decode(Data, [return_maps, {labels, binary}])),
-                    {ok, #{data => maps:get(data, DecodedData), meta => maps:get(meta, DecodedData)}};
-                false ->
-                    {ok, #{data => Data, meta => undefined}}
-            end;
-        {error, enoent} ->
-            {error, not_found}
-    end,
+    Reply =
+        case file:read_file(KeyringPath) of
+            {ok, Data} ->
+                case jsx:is_json(Data) of
+                    true ->
+                        DecodedData = decode_encrypted_keyring(
+                            jsx:decode(Data, [return_maps, {labels, binary}])
+                        ),
+                        {ok, #{data => maps:get(data, DecodedData), meta => maps:get(meta, DecodedData)}};
+                    false ->
+                        {ok, #{data => Data, meta => undefined}}
+                end;
+            {error, enoent} ->
+                {error, not_found}
+        end,
     {reply, Reply, State};
 handle_call({update, Keyring}, _From, #state{keyring_path = KeyringPath} = State) ->
     KeyringWithFormat = Keyring#{
@@ -87,12 +92,13 @@ handle_call({update, Keyring}, _From, #state{keyring_path = KeyringPath} = State
     ok = atomic_write(KeyringPath, jsx:encode(KeyringWithFormat)),
     {reply, ok, State};
 handle_call(delete, _From, #state{keyring_path = KeyringPath} = State) ->
-    _ = case file:delete(KeyringPath) of
-        ok ->
-            ok;
-        {error, enoent} ->
-            ok
-    end,
+    _ =
+        case file:delete(KeyringPath) of
+            ok ->
+                ok;
+            {error, enoent} ->
+                ok
+        end,
     {reply, ok, State}.
 
 -spec handle_cast(term(), state()) -> {noreply, state()}.
@@ -116,7 +122,7 @@ decode_encrypted_keyring(#{
         <<"version">> := Version,
         <<"keys">> := KeysMeta
     }
-})->
+}) ->
     #{
         data => KeyringData,
         meta => #{
@@ -128,7 +134,8 @@ decode_encrypted_keyring(#{
 
 decode_number_key_map(Map) ->
     maps:fold(
-        fun (K,
+        fun(
+            K,
             #{
                 <<"retired">> := Retired,
                 <<"security_parameters">> := #{
@@ -139,7 +146,8 @@ decode_number_key_map(Map) ->
                     }
                 }
             },
-            Acc) ->
+            Acc
+        ) ->
             Acc#{
                 binary_to_integer(K) => #{
                     retired => Retired,
@@ -154,4 +162,5 @@ decode_number_key_map(Map) ->
             }
         end,
         #{},
-        Map).
+        Map
+    ).

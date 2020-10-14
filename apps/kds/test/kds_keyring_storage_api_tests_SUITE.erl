@@ -26,7 +26,6 @@ all() ->
     ].
 
 -spec groups() -> [{atom(), list(), [atom()]}].
-
 groups() ->
     [
         {basic_lifecycle, [sequence], [
@@ -42,7 +41,6 @@ groups() ->
 %%
 
 -spec init_per_group(atom(), config()) -> config().
-
 init_per_group(_, C) ->
     C1 = kds_ct_utils:start_stash(C),
     C2 = kds_ct_utils:start_clear(C1),
@@ -60,12 +58,10 @@ init_per_group(_, C) ->
     ] ++ C2.
 
 -spec end_per_group(atom(), config()) -> _.
-
 end_per_group(_, C) ->
     kds_ct_utils:stop_clear(C).
 
 -spec init_check_keyring(config()) -> _.
-
 init_check_keyring(C) ->
     _ = ?assertEqual(
         {error, {invalid_status, not_initialized}},
@@ -81,7 +77,6 @@ init_check_keyring(C) ->
     ).
 
 -spec locked_unlocked_check_keyring(config()) -> _.
-
 locked_unlocked_check_keyring(C) ->
     _ = ?assertMatch(
         #{
@@ -105,7 +100,6 @@ locked_unlocked_check_keyring(C) ->
     ).
 
 -spec rotation_version_check(config()) -> _.
-
 rotation_version_check(C) ->
     _ = ?assertMatch(
         #{
@@ -128,7 +122,6 @@ rotation_version_check(C) ->
     ).
 
 -spec update_meta_version_check(config()) -> _.
-
 update_meta_version_check(C) ->
     _ = ?assertMatch(
         #{
@@ -143,7 +136,8 @@ update_meta_version_check(C) ->
     ),
     ok = kds_keyring_client:update_keyring_meta(
         #{keys => #{0 => #{retired => true}}},
-        management_root_url(C)),
+        management_root_url(C)
+    ),
     _ = ?assertMatch(
         #{
             meta := #{
@@ -157,7 +151,8 @@ update_meta_version_check(C) ->
     ),
     ok = kds_keyring_client:update_keyring_meta(
         #{current_key_id => 1},
-        management_root_url(C)),
+        management_root_url(C)
+    ),
     _ = ?assertMatch(
         #{
             meta := #{
