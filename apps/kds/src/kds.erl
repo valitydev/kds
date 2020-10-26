@@ -34,6 +34,7 @@ init([]) ->
     {ok, IP} = inet:parse_address(application:get_env(kds, ip, "::")),
     HealthCheck = genlib_app:env(?MODULE, health_check, #{}),
     HealthRoute = erl_health_handle:get_route(enable_health_logging(HealthCheck)),
+    PrometeusRoute = get_prometheus_route(),
     KeyringManagementService = woody_server:child_spec(
         kds_thrift_management_service_sup,
         #{
@@ -46,7 +47,7 @@ init([]) ->
             transport_opts => genlib_app:env(?MODULE, management_transport_opts, #{}),
             protocol_opts => genlib_app:env(?MODULE, protocol_opts, #{}),
             shutdown_timeout => genlib_app:env(?MODULE, shutdown_timeout, 0),
-            additional_routes => [HealthRoute]
+            additional_routes => [HealthRoute, PrometeusRoute]
         }
     ),
     KeyringStorageService = woody_server:child_spec(
@@ -83,6 +84,10 @@ init([]) ->
 enable_health_logging(Check) ->
     EvHandler = {erl_health_event_handler, []},
     maps:map(fun(_, V = {_, _, _}) -> #{runner => V, event_handler => EvHandler} end, Check).
+
+-spec get_prometheus_route() -> {iodata(), module(), _Opts :: any()}.
+get_prometheus_route() ->
+    {"/metrics/[:registry]", prometheus_cowboy2_handler, []}.
 
 %%
 %% Application callbacks
