@@ -20,7 +20,7 @@ BASE_IMAGE_TAG := 02a14b0cf68de5552e03a4f66f771411ff7964f8
 BUILD_IMAGE_NAME := build-erlang
 BUILD_IMAGE_TAG := 12beabfb5b6968c7566fa3d872ad1b3e8d612f46
 
-CALL_W_CONTAINER := all submodules compile xref lint dialyze test devrel \
+CALL_W_CONTAINER := all submodules compile xref lint dialyze test \
 					release clean distclean check_format format
 
 .PHONY: $(CALL_W_CONTAINER)
