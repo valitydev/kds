@@ -44,7 +44,7 @@
 
 -type cedf() :: #cedf{}.
 
--define(CIPHER_TYPE, aes_gcm).
+-define(CIPHER_TYPE, aes_256_gcm).
 
 %% interface
 
@@ -57,7 +57,7 @@ encrypt(Key, Plain) ->
     IV = iv(),
     AAD = aad(),
     try
-        {Cipher, Tag} = crypto:block_encrypt(?CIPHER_TYPE, Key, IV, {AAD, Plain}),
+        {Cipher, Tag} = crypto:crypto_one_time_aead(?CIPHER_TYPE, Key, IV, Plain, AAD, true),
         marshall_cedf(#cedf{iv = IV, aad = AAD, cipher = Cipher, tag = Tag})
     catch
         Class:_Reason:Stacktrace ->
@@ -85,7 +85,7 @@ public_encrypt(PublicKey, Plain) ->
 decrypt(Key, MarshalledCEDF) ->
     try
         #cedf{iv = IV, aad = AAD, cipher = Cipher, tag = Tag} = unmarshall_cedf(MarshalledCEDF),
-        crypto:block_decrypt(?CIPHER_TYPE, Key, IV, {AAD, Cipher, Tag})
+        crypto:crypto_one_time_aead(?CIPHER_TYPE, Key, IV, Cipher, AAD, Tag, false)
     of
         error ->
             throw(decryption_failed);
