@@ -25,10 +25,11 @@
 
 -type keyring_meta_diff() :: #{
     current_key_id => non_neg_integer() | undefined,
-    keys => #{
-        key_id() => key_meta_diff()
-    }
-    | undefined
+    keys =>
+        #{
+            key_id() => key_meta_diff()
+        }
+        | undefined
 }.
 
 -type key_meta() :: #{

@@ -101,7 +101,8 @@ start_clear(Config) ->
                         owner => <<"ndiezel">>,
                         public_keys => #{
                             enc =>
-                                <<"{\n"
+                                <<
+                                    "{\n"
                                     "\"use\": \"enc\",\n"
                                     "\"kty\": \"RSA\",\n"
                                     "\"kid\": \"KUb1fNMc5j9Ei_IV3DguhJh5UOH30uvO7qXq13uevnk\",\n"
@@ -119,21 +120,25 @@ start_clear(Config) ->
                                     "DJKC0U2yufePcA3nUJEhtR3UO_tIlHxZvlDSX5eTx4vs5VkFfujNSiPsgH0P"
                                     "EeXABGBFbal7QxU1u0XHXIFwhW5cM8Fs\",\n"
                                     "\"e\": \"AQAB\"\n"
-                                    "}">>,
+                                    "}"
+                                >>,
                             sig =>
-                                <<"{\n"
+                                <<
+                                    "{\n"
                                     "\"crv\":\"Ed25519\",\n"
                                     "\"kid\":\"K3ZpHNJw3IZYu4fefhImUtB47eSBD4nRmpjWIoGukyg\",\n"
                                     "\"kty\":\"OKP\",\n"
                                     "\"x\":\"hqoiLZvfBzgtFQop3mBzUACee1ycgaT3tJIcKQ2Ndjc\"\n"
-                                    "}">>
+                                    "}"
+                                >>
                         }
                     },
                     <<"2">> => #{
                         owner => <<"ndiezel2">>,
                         public_keys => #{
                             enc =>
-                                <<"{\n"
+                                <<
+                                    "{\n"
                                     "\"use\": \"enc\",\n"
                                     "\"kty\": \"RSA\",\n"
                                     "\"kid\": \"JHKqPDhPO8ZnZsloKTHt44UbzYFnKnf_zowfL_zNFRE\",\n"
@@ -151,21 +156,25 @@ start_clear(Config) ->
                                     "QXg7JhJUY-gXdMgbdLyY5zrawkwsJhq_Lpsk6dHQsxV35imi7kNkOTnoiI-S"
                                     "pswrACIlThnT56xC5ROuFRxAlrpZef-c\",\n"
                                     "\"e\": \"AQAB\"\n"
-                                    "}">>,
+                                    "}"
+                                >>,
                             sig =>
-                                <<"{\n"
+                                <<
+                                    "{\n"
                                     "\"crv\":\"Ed25519\",\n"
                                     "\"kid\":\"Q_85NCYwrmJr1vcbPOzO8g31_ohqFLpVoaGysWPwCbc\",\n"
                                     "\"kty\":\"OKP\",\n"
                                     "\"x\":\"JhVaGPlRm67u0oGbgxAgqnfLfXeW0aGjhCrBf_C1Fiw\"\n"
-                                    "}">>
+                                    "}"
+                                >>
                         }
                     },
                     <<"3">> => #{
                         owner => <<"ndiezel3">>,
                         public_keys => #{
                             enc =>
-                                <<"{\n"
+                                <<
+                                    "{\n"
                                     "\"use\": \"enc\",\n"
                                     "\"kty\": \"RSA\",\n"
                                     "\"kid\": \"xBET5c4u0yT6pDb_Cok0exHe_wQVetVpkGKn_1mmn7A\",\n"
@@ -183,14 +192,17 @@ start_clear(Config) ->
                                     "yVyAzIvDyOVdSmUPPeGxnI1YWKX-5t5SnlnpWO1Rqqh6RBtxu_1JGfq77d2k"
                                     "hskTaPXxc1E5iyCYLFI0UgreCXpBzSGU\",\n"
                                     "\"e\": \"AQAB\"\n"
-                                    "}">>,
+                                    "}"
+                                >>,
                             sig =>
-                                <<"{\n"
+                                <<
+                                    "{\n"
                                     "\"crv\":\"Ed25519\",\n"
                                     "\"kid\":\"nwy3plcwQj_b70JJ3maZkN-VFQpjGCVRyIFYNeC0vvs\",\n"
                                     "\"kty\":\"OKP\",\n"
                                     "\"x\":\"af4UVYqUB4g711yGxzKjWvd27c9WY1EQ1a1-fwk0A6w\"\n"
-                                    "}">>
+                                    "}"
+                                >>
                         }
                     }
                 }}
