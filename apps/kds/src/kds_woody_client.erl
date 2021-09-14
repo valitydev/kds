@@ -18,11 +18,11 @@
 %% API
 %%
 
--spec call(atom(), atom(), list(), woody:url()) -> result().
+-spec call(atom(), atom(), woody:args(), woody:url()) -> result().
 call(ServiceCode, Function, Args, RootUrl) ->
     call(ServiceCode, Function, Args, RootUrl, #{}).
 
--spec call(atom(), atom(), list(), woody:url(), woody_client:options() | map()) -> result().
+-spec call(atom(), atom(), woody:args(), woody:url(), woody_client:options() | map()) -> result().
 call(ServiceCode, Function, Args, RootUrl, ExtraOpts) ->
     Request = {kds_thrift_services:service(ServiceCode), Function, Args},
     Path = genlib:to_binary(kds_thrift_services:path(ServiceCode)),

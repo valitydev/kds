@@ -9,7 +9,6 @@
         crypto,
         woody,
         erl_health,
-        how_are_you,
         shamir,
         scoper,
         msgpack,

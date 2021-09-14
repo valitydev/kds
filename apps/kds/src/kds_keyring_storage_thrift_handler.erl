@@ -23,7 +23,7 @@ handle_function(OperationID, Args, Context, Opts) ->
         )
     ).
 
-handle_function_('GetKeyring', [], _Context, _Opts) ->
+handle_function_('GetKeyring', {}, _Context, _Opts) ->
     try kds_keyring_manager:get_keyring() of
         Keyring ->
             {ok, encode_keyring(Keyring)}

@@ -18,5 +18,5 @@ build('kds', 'docker-host', finalHook) {
     pipeErlangService = load("${env.JENKINS_LIB}/pipeErlangService.groovy")
   }
 
-  pipeErlangService.runPipe(false, true)
+  pipeErlangService.runPipe(false)
 }
