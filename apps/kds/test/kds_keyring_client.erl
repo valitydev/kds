@@ -56,7 +56,7 @@ start_init(Threshold, RootUrl) ->
     | {error, {invalid_status, kds_keyring_manager:state()}}
     | {error, {invalid_activity, {initialization, kds_keyring_initializer:state()}}}
     | {error, verification_failed}
-    | {error, {invalid_arguments, binary()}}.
+    | {error, {operation_aborted, binary()}}.
 validate_init(ShareholderId, Share, RootUrl) ->
     SignedShare = encode_signed_share(ShareholderId, Share),
     try kds_woody_client:call(keyring_management, 'ValidateInit', {SignedShare}, RootUrl) of
@@ -203,7 +203,7 @@ cancel_rotate(RootUrl) ->
 -spec start_rekey(integer(), woody:url()) ->
     ok
     | {error, {invalid_status, kds_keyring_manager:state()}}
-    | {error, {invalid_activity, {rekeying, kds_keyring_rotator:state()}}}
+    | {error, {invalid_activity, {rekeying, kds_keyring_rekeyer:state()}}}
     | {error, {invalid_arguments, binary()}}.
 start_rekey(Threshold, RootUrl) ->
     try
@@ -221,7 +221,7 @@ start_rekey(Threshold, RootUrl) ->
     ok
     | {more_keys_needed, non_neg_integer()}
     | {error, {invalid_status, kds_keyring_manager:state()}}
-    | {error, {invalid_activity, {rekeying, kds_keyring_rotator:state()}}}
+    | {error, {invalid_activity, {rekeying, kds_keyring_rekeyer:state()}}}
     | {error, verification_failed}
     | {error, {operation_aborted, binary()}}.
 confirm_rekey(ShareholderId, Share, RootUrl) ->
@@ -245,7 +245,7 @@ confirm_rekey(ShareholderId, Share, RootUrl) ->
 -spec start_rekey_validation(woody:url()) ->
     [kds_keysharing:encrypted_master_key_share()]
     | {error, {invalid_status, kds_keyring_manager:state()}}
-    | {error, {invalid_activity, {rekeying, kds_keyring_rotator:state()}}}.
+    | {error, {invalid_activity, {rekeying, kds_keyring_rekeyer:state()}}}.
 start_rekey_validation(RootUrl) ->
     try kds_woody_client:call(keyring_management, 'StartRekeyValidation', {}, RootUrl) of
         EncryptedShares ->
@@ -261,7 +261,7 @@ start_rekey_validation(RootUrl) ->
     ok
     | {more_keys_needed, non_neg_integer()}
     | {error, {invalid_status, kds_keyring_manager:state()}}
-    | {error, {invalid_activity, {rekeying, kds_keyring_rotator:state()}}}
+    | {error, {invalid_activity, {rekeying, kds_keyring_rekeyer:state()}}}
     | {error, verification_failed}
     | {error, {operation_aborted, binary()}}.
 validate_rekey(ShareholderId, Share, RootUrl) ->
@@ -298,7 +298,7 @@ get_state(RootUrl) ->
     State = kds_woody_client:call(keyring_management, 'GetState', {}, RootUrl),
     decode_state(State).
 
--spec update_keyring_meta(kds_keyring_meta:keyring_meta(), woody:url()) ->
+-spec update_keyring_meta(kds_keyring_meta:keyring_meta_diff(), woody:url()) ->
     ok
     | {error, {invalid_keyring_meta, binary()}}
     | {error, {invalid_status, kds_keyring_manager:state()}}.
@@ -318,7 +318,9 @@ get_keyring_meta(RootUrl) ->
     KeyringMeta = kds_woody_client:call(keyring_management, 'GetKeyringMeta', {}, RootUrl),
     kds_keyring_meta:decode_keyring_meta(KeyringMeta).
 
--spec get_keyring(woody:url(), term()) -> kds_keyring:keyring().
+-spec get_keyring(woody:url(), term()) ->
+    kds_keyring:keyring()
+    | {error, {invalid_status, not_initialized | locked}}.
 get_keyring(RootUrl, SSLOptions) ->
     ExtraOpts = #{
         transport_opts => #{

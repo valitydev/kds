@@ -48,7 +48,7 @@
 -type encrypted_keyring() :: kds_keyring:encrypted_keyring().
 -type keyring() :: kds_keyring:keyring().
 
--type state() :: uninitialized | validation.
+-type state() :: uninitialized | confirmation | postconfirmation | validation.
 
 -type threshold() :: kds_keysharing:threshold().
 
