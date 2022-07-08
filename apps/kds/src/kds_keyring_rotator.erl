@@ -1,6 +1,6 @@
 -module(kds_keyring_rotator).
 
--behavior(gen_statem).
+-behaviour(gen_statem).
 
 -include_lib("shamir/include/shamir.hrl").
 

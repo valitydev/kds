@@ -2,8 +2,6 @@
 
 -behaviour(gen_statem).
 
--include_lib("shamir/include/shamir.hrl").
-
 %% API.
 -export([start_link/0]).
 -export([get_keyring/0]).

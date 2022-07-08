@@ -14,9 +14,7 @@
         msgpack,
         lib_combin,
         jose,
-        cds_proto,
-        prometheus,
-        prometheus_cowboy
+        cds_proto
     ]},
     {env, []},
     {modules, []},

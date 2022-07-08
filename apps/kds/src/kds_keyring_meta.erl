@@ -50,9 +50,9 @@
 }.
 
 -type key_id() :: kds_keyring:key_id().
--type encoded_keyring_meta() :: #cds_KeyringMeta{}.
--type encoded_keyring_meta_diff() :: #cds_KeyringMetaDiff{}.
--type encoded_security_parameters() :: #cds_SecurityParameters{}.
+-type encoded_keyring_meta() :: #'cds_KeyringMeta'{}.
+-type encoded_keyring_meta_diff() :: #'cds_KeyringMetaDiff'{}.
+-type encoded_security_parameters() :: #'cds_SecurityParameters'{}.
 
 -define(DEFAULT_SEC_PARAMS, #{
     deduplication_hash_opts => #{

@@ -1,6 +1,6 @@
 -module(kds_keyring_initializer).
 
--behavior(gen_statem).
+-behaviour(gen_statem).
 
 -include_lib("shamir/include/shamir.hrl").
 
