@@ -1,7 +1,5 @@
 -module(kds_keyring_storage_tests_SUITE).
 
--include_lib("common_test/include/ct.hrl").
-
 -export([all/0]).
 -export([groups/0]).
 -export([init_per_group/2]).
@@ -16,7 +14,7 @@
 -export([create_old_format/1]).
 -export([read_old_format/1]).
 
--type config() :: [tuple()].
+-type config() :: [{atom(), term()}].
 
 -spec all() -> [{group, atom()}].
 all() ->
@@ -53,7 +51,7 @@ init_per_group(_, C) ->
     C1 = kds_ct_utils:start_stash(C),
     kds_ct_utils:start_clear(C1).
 
--spec end_per_group(atom(), config()) -> config().
+-spec end_per_group(atom(), config()) -> _.
 end_per_group(_, C) ->
     kds_ct_utils:stop_clear(C).
 

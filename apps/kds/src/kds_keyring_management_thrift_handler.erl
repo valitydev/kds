@@ -7,7 +7,7 @@
 %% woody_server_thrift_handler callbacks
 -export([handle_function/4]).
 
--type encrypted_masterkey_share() :: #cds_EncryptedMasterKeyShare{}.
+-type encrypted_masterkey_share() :: #'cds_EncryptedMasterKeyShare'{}.
 
 %%
 %% woody_server_thrift_handler callbacks
@@ -30,11 +30,11 @@ handle_function_('StartInit', {Threshold}, _Context, _Opts) ->
         EncryptedMasterKeyShares ->
             {ok, encode_encrypted_shares(EncryptedMasterKeyShares)}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        invalid_args ->
+        throw:invalid_args ->
             raise(#cds_InvalidArguments{})
     end;
 handle_function_('ValidateInit', {SignedShare}, _Context, _Opts) ->
@@ -46,36 +46,36 @@ handle_function_('ValidateInit', {SignedShare}, _Context, _Opts) ->
         ok ->
             {ok, {success, #cds_Success{}}}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        {operation_aborted, Reason} ->
+        throw:{operation_aborted, Reason} ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelInit', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:cancel_init()}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('Lock', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:lock()}
     catch
-        {invalid_status, locked} ->
+        throw:{invalid_status, locked} ->
             {ok, ok};
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('StartUnlock', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:start_unlock()}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity})
     end;
 handle_function_('ConfirmUnlock', {SignedShare}, _Context, _Opts) ->
@@ -87,27 +87,27 @@ handle_function_('ConfirmUnlock', {SignedShare}, _Context, _Opts) ->
         ok ->
             {ok, {success, #cds_Success{}}}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        {operation_aborted, Reason} ->
+        throw:{operation_aborted, Reason} ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelUnlock', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:cancel_unlock()}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('StartRotate', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:start_rotate()}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity})
     end;
 handle_function_('ConfirmRotate', {SignedShare}, _Context, _Opts) ->
@@ -119,29 +119,29 @@ handle_function_('ConfirmRotate', {SignedShare}, _Context, _Opts) ->
         ok ->
             {ok, {success, #cds_Success{}}}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        {operation_aborted, Reason} ->
+        throw:{operation_aborted, Reason} ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelRotate', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:cancel_rotate()}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('StartRekey', {Threshold}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:start_rekey(Threshold)}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        invalid_args ->
+        throw:invalid_args ->
             raise(#cds_InvalidArguments{})
     end;
 handle_function_('ConfirmRekey', {SignedShare}, _Context, _Opts) ->
@@ -153,11 +153,11 @@ handle_function_('ConfirmRekey', {SignedShare}, _Context, _Opts) ->
         ok ->
             {ok, {success, #cds_Success{}}}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        {operation_aborted, Reason} ->
+        throw:{operation_aborted, Reason} ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('StartRekeyValidation', {}, _Context, _Opts) ->
@@ -165,9 +165,9 @@ handle_function_('StartRekeyValidation', {}, _Context, _Opts) ->
         EncryptedMasterKeyShares ->
             {ok, encode_encrypted_shares(EncryptedMasterKeyShares)}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity})
     end;
 handle_function_('ValidateRekey', {SignedShare}, _Context, _Opts) ->
@@ -179,18 +179,18 @@ handle_function_('ValidateRekey', {SignedShare}, _Context, _Opts) ->
         ok ->
             {ok, {success, #cds_Success{}}}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {invalid_activity, Activity} ->
+        throw:{invalid_activity, Activity} ->
             raise(#cds_InvalidActivity{activity = Activity});
-        {operation_aborted, Reason} ->
+        throw:{operation_aborted, Reason} ->
             raise(#cds_OperationAborted{reason = atom_to_binary(Reason, utf8)})
     end;
 handle_function_('CancelRekey', {}, _Context, _Opts) ->
     try
         {ok, kds_keyring_manager:cancel_rekey()}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('GetState', {}, _Context, _Opts) ->
@@ -206,9 +206,9 @@ handle_function_('UpdateKeyringMeta', {KeyringMeta}, _Context, _Opts) ->
         ok ->
             {ok, ok}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status});
-        {validation_failed, Reason} ->
+        throw:{validation_failed, Reason} ->
             raise(#cds_InvalidKeyringMeta{reason = erlang:atom_to_binary(Reason, utf8)})
     end;
 handle_function_('GetKeyringMeta', {}, _Context, _Opts) ->

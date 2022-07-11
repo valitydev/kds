@@ -1,6 +1,5 @@
 -module(kds_keyring_api_tests_SUITE).
 
--include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("shamir/include/shamir.hrl").
 
@@ -70,6 +69,7 @@ groups() ->
             rekey,
             rekey_with_timeout,
             rekey_with_cancel,
+            rotate,
             rotate_with_timeout,
             lock
         ]},
@@ -454,7 +454,7 @@ rotate(C) ->
     ),
     _ = ?assertEqual(ok, kds_keyring_client:start_rotate(root_url(C))),
     _ = ?assertEqual(
-        {error, {invalid_activity, {rotation, confirmation}}},
+        {error, {invalid_activity, {rotation, validation}}},
         kds_keyring_client:start_rotate(root_url(C))
     ),
     _ = ?assertEqual({more_keys_needed, 1}, kds_keyring_client:confirm_rotate(Id1, MasterKey1, root_url(C))),

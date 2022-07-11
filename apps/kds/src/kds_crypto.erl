@@ -1,7 +1,6 @@
 -module(kds_crypto).
 
 -include_lib("jose/include/jose_jwk.hrl").
--include_lib("jose/include/jose_jws.hrl").
 
 -export([key/0]).
 -export([encrypt/2]).

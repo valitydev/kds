@@ -16,7 +16,7 @@
 -export_type([keyring_meta_diff/0]).
 
 -type keyring_meta() :: #{
-    current_key_id := non_neg_integer(),
+    current_key_id := key_id(),
     version := pos_integer(),
     keys := #{
         key_id() => key_meta()
@@ -24,7 +24,7 @@
 }.
 
 -type keyring_meta_diff() :: #{
-    current_key_id => non_neg_integer() | undefined,
+    current_key_id => key_id() | undefined,
     keys =>
         #{
             key_id() => key_meta_diff()
@@ -50,9 +50,9 @@
 }.
 
 -type key_id() :: kds_keyring:key_id().
--type encoded_keyring_meta() :: #cds_KeyringMeta{}.
--type encoded_keyring_meta_diff() :: #cds_KeyringMetaDiff{}.
--type encoded_security_parameters() :: #cds_SecurityParameters{}.
+-type encoded_keyring_meta() :: #'cds_KeyringMeta'{}.
+-type encoded_keyring_meta_diff() :: #'cds_KeyringMetaDiff'{}.
+-type encoded_security_parameters() :: #'cds_SecurityParameters'{}.
 
 -define(DEFAULT_SEC_PARAMS, #{
     deduplication_hash_opts => #{

@@ -1,8 +1,6 @@
 -module(kds_keyring_storage_api_tests_SUITE).
 
--include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--include_lib("shamir/include/shamir.hrl").
 
 -export([all/0]).
 -export([groups/0]).
@@ -14,7 +12,7 @@
 -export([rotation_version_check/1]).
 -export([update_meta_version_check/1]).
 
--type config() :: [{tuple()}].
+-type config() :: [{atom(), term()}].
 
 -spec test() -> _.
 

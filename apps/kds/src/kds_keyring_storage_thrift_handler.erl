@@ -28,7 +28,7 @@ handle_function_('GetKeyring', {}, _Context, _Opts) ->
         Keyring ->
             {ok, encode_keyring(Keyring)}
     catch
-        {invalid_status, Status} ->
+        throw:{invalid_status, Status} ->
             raise(#cds_InvalidStatus{status = Status})
     end.
 
