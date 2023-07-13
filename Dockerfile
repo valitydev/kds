@@ -23,6 +23,8 @@ RUN rebar3 compile && \
 FROM docker.io/library/erlang:${OTP_VERSION}-slim
 
 ARG SERVICE_NAME
+ARG USER_UID=1001
+ARG USER_GID=$USER_UID
 
 # Set env
 ENV CHARSET=UTF-8
@@ -36,6 +38,15 @@ COPY --from=builder /build/_build/prod/rel/${SERVICE_NAME} /opt/${SERVICE_NAME}
 RUN echo "#!/bin/sh" >> /entrypoint.sh && \
     echo "exec /opt/${SERVICE_NAME}/bin/${SERVICE_NAME} foreground" >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
+
+# Setup user
+RUN groupadd --gid ${USER_GID} ${SERVICE_NAME} && \
+    mkdir /var/log/${SERVICE_NAME} && \
+    chown ${USER_UID}:${USER_GID} /var/log/${SERVICE_NAME} && \
+    useradd --uid ${USER_UID} --gid ${USER_GID} -M ${SERVICE_NAME}
+
+USER ${SERVICE_NAME}
+
 ENTRYPOINT []
 CMD ["/entrypoint.sh"]
 
