@@ -65,9 +65,11 @@ init_check_keyring(C) ->
         {error, {invalid_status, not_initialized}},
         get_keyring(C)
     ),
-    _ = kds_ct_utils:await_initialization_phase(uninitialized, management_root_url(C), 3000, 200),
+    Timeout = genlib_app:env(kds, keyring_initialize_lifetime),
+    _ = kds_ct_utils:await_initialization_phase(uninitialized, management_root_url(C), Timeout, 200),
     _ = kds_ct_keyring:init(C),
-    _ = kds_ct_utils:await_status(unlocked, management_root_url(C), 3000, 200),
+    UnlockTimeout = genlib_app:env(kds, keyring_unlock_lifetime),
+    _ = kds_ct_utils:await_status(unlocked, management_root_url(C), UnlockTimeout, 200),
     _ = ?assertMatch(
         #{
             meta := #{current_key_id := 0, version := 1, keys := #{0 := #{retired := false}}},

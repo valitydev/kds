@@ -99,7 +99,7 @@ start_clear(Config) ->
                 {keyring_rotation_lifetime, 1000},
                 {keyring_unlock_lifetime, 1000},
                 {keyring_rekeying_lifetime, 3000},
-                {keyring_initialize_lifetime, 3000},
+                {keyring_initialize_lifetime, 10000},
                 {shareholders, #{
                     <<"1">> => #{
                         owner => <<"ndiezel">>,

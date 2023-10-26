@@ -139,29 +139,17 @@ end_per_group(_, C) ->
 -spec init(config()) -> _.
 init(C) ->
     Threshold = 2,
+    EncryptedMasterKeyShares = kds_keyring_client:start_init(Threshold, root_url(C)),
     Shareholders = kds_shareholder:get_all(),
+    _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
     SigPrivateKeys = sig_private_keys(C),
-    EncryptedMasterKeyShares = kds_keyring_client:start_init(Threshold, root_url(C)),
-    %% DEBUG
-    _ = ?assertMatch(
-        #{
-            status := not_initialized,
-            activities := #{
-                initialization := #{
-                    phase := validation,
-                    validation_shares := #{}
-                }
-            }
-        },
-        kds_ct_utils:await_initialization_phase(validation, root_url(C), 1000, 100)
-    ),
-    _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(
         EncryptedMasterKeyShares,
         EncPrivateKeys,
         SigPrivateKeys
     ),
+    Timeout = genlib_app:env(kds, keyring_initialize_lifetime),
     _ = ?assertMatch(
         #{
             status := not_initialized,
@@ -172,7 +160,7 @@ init(C) ->
                 }
             }
         },
-        kds_ct_utils:await_initialization_phase(validation, root_url(C), 1000, 100)
+        kds_ct_utils:await_initialization_phase(validation, root_url(C), Timeout, 200)
     ),
     ok = validate_init(DecryptedMasterKeyShares, C),
     _ = ?assertMatch(
@@ -205,7 +193,8 @@ init_with_timeout(C) ->
 init_with_cancel(C) ->
     {Id, DecryptedMasterKeyShare} = partial_init(C),
     ok = kds_keyring_client:cancel_init(root_url(C)),
-    _ = kds_ct_utils:await_initialization_phase(uninitialized, root_url(C), 3000, 200),
+    Timeout = genlib_app:env(kds, keyring_initialize_lifetime),
+    _ = kds_ct_utils:await_initialization_phase(uninitialized, root_url(C), Timeout, 200),
     _ = ?assertEqual(
         {error, {invalid_activity, {initialization, uninitialized}}},
         kds_keyring_client:validate_init(Id, DecryptedMasterKeyShare, root_url(C))
