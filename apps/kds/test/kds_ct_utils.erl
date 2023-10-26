@@ -265,7 +265,7 @@ await_initialization_phase(ExpectedPhase, RootUrl, Timeout, WaitTime) ->
 -spec await_matching_state(
     pos_integer(), woody:url(), fun((kds_keyring_manager:status()) -> ok | {wait, pos_integer()})
 ) ->
-    kds_keyring_manager:status() | {error, timeout}.
+    kds_keyring_manager:status() | {error, timeout, kds_keyring_manager:status()}.
 await_matching_state(Timeout, RootUrl, F) ->
     TimeoutTime = erlang:monotonic_time(millisecond) + Timeout,
     {ok, State} = await_matching_state_(TimeoutTime, RootUrl, F),
@@ -283,7 +283,7 @@ await_matching_state_(TimeoutTime, RootUrl, F) ->
                     await_matching_state_(TimeoutTime, RootUrl, F)
             end;
         _ ->
-            {error, timeout}
+            {error, timeout, State}
     end.
 
 %%
