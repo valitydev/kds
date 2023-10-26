@@ -139,11 +139,11 @@ end_per_group(_, C) ->
 -spec init(config()) -> _.
 init(C) ->
     Threshold = 2,
-    EncryptedMasterKeyShares = kds_keyring_client:start_init(Threshold, root_url(C)),
     Shareholders = kds_shareholder:get_all(),
-    _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     EncPrivateKeys = enc_private_keys(C),
     SigPrivateKeys = sig_private_keys(C),
+    EncryptedMasterKeyShares = kds_keyring_client:start_init(Threshold, root_url(C)),
+    _ = ?assertEqual(length(EncryptedMasterKeyShares), length(Shareholders)),
     DecryptedMasterKeyShares = kds_ct_keyring:decrypt_and_sign_masterkeys(
         EncryptedMasterKeyShares,
         EncPrivateKeys,
@@ -159,7 +159,7 @@ init(C) ->
                 }
             }
         },
-        kds_ct_utils:await_initialization_phase(validation, root_url(C), 5000, 200)
+        kds_ct_utils:await_initialization_phase(validation, root_url(C), 1000, 100)
     ),
     ok = validate_init(DecryptedMasterKeyShares, C),
     _ = ?assertMatch(
