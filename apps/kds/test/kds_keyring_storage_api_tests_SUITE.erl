@@ -65,8 +65,9 @@ init_check_keyring(C) ->
         {error, {invalid_status, not_initialized}},
         get_keyring(C)
     ),
+    _ = kds_ct_utils:await_initialization_phase(uninitialized, management_root_url(C), 3000, 200),
     _ = kds_ct_keyring:init(C),
-    _ = kds_ct_utils:await_status(unlocked, management_root_url(C), 500, 100),
+    _ = kds_ct_utils:await_status(unlocked, management_root_url(C), 3000, 200),
     _ = ?assertMatch(
         #{
             meta := #{current_key_id := 0, version := 1, keys := #{0 := #{retired := false}}},
