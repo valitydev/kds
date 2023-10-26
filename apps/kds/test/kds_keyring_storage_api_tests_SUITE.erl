@@ -66,6 +66,7 @@ init_check_keyring(C) ->
         get_keyring(C)
     ),
     _ = kds_ct_keyring:init(C),
+    _ = kds_ct_utils:await_status(unlocked, management_root_url(C), 500, 100),
     _ = ?assertMatch(
         #{
             meta := #{current_key_id := 0, version := 1, keys := #{0 := #{retired := false}}},
