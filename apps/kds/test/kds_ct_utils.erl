@@ -280,7 +280,7 @@ await_matching_state_(TimeoutTime, RootUrl, F) ->
                     {ok, State};
                 {wait, WaitTime} ->
                     ok = timer:sleep(WaitTime),
-                    await_matching_state(TimeoutTime, RootUrl, F)
+                    await_matching_state_(TimeoutTime, RootUrl, F)
             end;
         _ ->
             {error, timeout}
