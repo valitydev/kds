@@ -159,7 +159,7 @@ init(C) ->
                 }
             }
         },
-        kds_ct_utils:await_initialization_phase(validation, root_url(C), 5000, 200)
+        kds_ct_utils:await_status(not_initialized, root_url(C), 5000, 200)
     ),
     ok = validate_init(DecryptedMasterKeyShares, C),
     _ = ?assertMatch(
