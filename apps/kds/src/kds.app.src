@@ -14,7 +14,10 @@
         msgpack,
         lib_combin,
         jose,
-        cds_proto
+        cds_proto,
+        opentelemetry_api,
+        opentelemetry_exporter,
+        opentelemetry
     ]},
     {env, []},
     {modules, []},
