@@ -43,6 +43,9 @@ RUN echo "#!/bin/sh" >> /entrypoint.sh && \
 RUN groupadd --gid ${USER_GID} ${SERVICE_NAME} && \
     mkdir /var/log/${SERVICE_NAME} && \
     chown ${USER_UID}:${USER_GID} /var/log/${SERVICE_NAME} && \
+    # Default keyring file storage path
+    mkdir -p /var/lib/${SERVICE_NAME} && \
+    chown ${USER_UID}:${USER_GID} /var/lib/${SERVICE_NAME} && \
     # Create home directory since dynamic erlang cookie is expected to be generated there
     useradd --uid ${USER_UID} --gid ${USER_GID} -m ${SERVICE_NAME}
 
