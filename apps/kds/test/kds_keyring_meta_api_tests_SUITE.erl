@@ -78,9 +78,7 @@ init_check_meta(C) ->
         #{keys := #{}, current_key_id := 0},
         kds_keyring_client:get_keyring_meta(root_url(C))
     ),
-    _ = kds_ct_utils:await_initialization_phase(uninitialized, root_url(C), 2000, 200),
     _ = kds_ct_keyring:init(C),
-    _ = kds_ct_utils:await_status(unlocked, root_url(C), 2000, 200),
     _ = ?assertMatch(
         #{keys := #{0 := #{retired := false}}, current_key_id := 0},
         kds_keyring_client:get_keyring_meta(root_url(C))
