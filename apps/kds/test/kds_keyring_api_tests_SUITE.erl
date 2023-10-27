@@ -149,6 +149,7 @@ init(C) ->
         EncPrivateKeys,
         SigPrivateKeys
     ),
+    Timeout = genlib_app:env(kds, keyring_initialize_lifetime),
     _ = ?assertMatch(
         #{
             status := not_initialized,
@@ -159,7 +160,7 @@ init(C) ->
                 }
             }
         },
-        kds_keyring_client:get_state(root_url(C))
+        kds_ct_utils:await_initialization_phase(validation, root_url(C), Timeout, 200)
     ),
     ok = validate_init(DecryptedMasterKeyShares, C),
     _ = ?assertMatch(
@@ -182,7 +183,7 @@ init(C) ->
 init_with_timeout(C) ->
     {Id, DecryptedMasterKeyShare} = partial_init(C),
     Timeout = genlib_app:env(kds, keyring_rotation_lifetime, 4000),
-    ok = timer:sleep(Timeout + 1500),
+    _ = kds_ct_utils:await_initialization_phase(uninitialized, root_url(C), Timeout + 2000, 200),
     _ = ?assertEqual(
         {error, {invalid_activity, {initialization, uninitialized}}},
         kds_keyring_client:validate_init(Id, DecryptedMasterKeyShare, root_url(C))
@@ -192,6 +193,8 @@ init_with_timeout(C) ->
 init_with_cancel(C) ->
     {Id, DecryptedMasterKeyShare} = partial_init(C),
     ok = kds_keyring_client:cancel_init(root_url(C)),
+    Timeout = genlib_app:env(kds, keyring_initialize_lifetime),
+    _ = kds_ct_utils:await_initialization_phase(uninitialized, root_url(C), Timeout, 200),
     _ = ?assertEqual(
         {error, {invalid_activity, {initialization, uninitialized}}},
         kds_keyring_client:validate_init(Id, DecryptedMasterKeyShare, root_url(C))

@@ -11,6 +11,10 @@
 
 -export([start_stash/1]).
 
+-export([await_status/4]).
+-export([await_initialization_phase/4]).
+-export([await_matching_state/3]).
+
 %%
 %% Types
 %%
@@ -95,7 +99,7 @@ start_clear(Config) ->
                 {keyring_rotation_lifetime, 1000},
                 {keyring_unlock_lifetime, 1000},
                 {keyring_rekeying_lifetime, 3000},
-                {keyring_initialize_lifetime, 3000},
+                {keyring_initialize_lifetime, 10000},
                 {shareholders, #{
                     <<"1">> => #{
                         owner => <<"ndiezel">>,
@@ -239,6 +243,48 @@ start_stash(C) ->
     [
         {stash, kds_ct_stash:start()}
     ] ++ C.
+
+-spec await_status(atom(), woody:url(), pos_integer(), pos_integer()) -> kds_keyring_manager:status().
+await_status(ExpectedStatus, RootUrl, Timeout, WaitTime) ->
+    await_matching_state(Timeout, RootUrl, fun
+        (#{status := Status}) when Status =:= ExpectedStatus ->
+            ok;
+        (_State) ->
+            {wait, WaitTime}
+    end).
+
+-spec await_initialization_phase(atom(), woody:url(), pos_integer(), pos_integer()) -> kds_keyring_manager:status().
+await_initialization_phase(ExpectedPhase, RootUrl, Timeout, WaitTime) ->
+    await_matching_state(Timeout, RootUrl, fun
+        (#{activities := #{initialization := #{phase := Phase}}}) when Phase =:= ExpectedPhase ->
+            ok;
+        (_State) ->
+            {wait, WaitTime}
+    end).
+
+-spec await_matching_state(
+    pos_integer(), woody:url(), fun((kds_keyring_manager:status()) -> ok | {wait, pos_integer()})
+) ->
+    kds_keyring_manager:status() | {error, timeout, kds_keyring_manager:status()}.
+await_matching_state(Timeout, RootUrl, F) ->
+    TimeoutTime = erlang:monotonic_time(millisecond) + Timeout,
+    {ok, State} = await_matching_state_(TimeoutTime, RootUrl, F),
+    State.
+
+await_matching_state_(TimeoutTime, RootUrl, F) ->
+    State = kds_keyring_client:get_state(RootUrl),
+    case erlang:monotonic_time(millisecond) of
+        Time when Time < TimeoutTime ->
+            case F(State) of
+                ok ->
+                    {ok, State};
+                {wait, WaitTime} ->
+                    ok = timer:sleep(WaitTime),
+                    await_matching_state_(TimeoutTime, RootUrl, F)
+            end;
+        _ ->
+            {error, timeout, State}
+    end.
 
 %%
 %% Internals
