@@ -181,7 +181,7 @@ init(C) ->
 -spec init_with_timeout(config()) -> _.
 init_with_timeout(C) ->
     {Id, DecryptedMasterKeyShare} = partial_init(C),
-    Timeout = genlib_app:env(kds, keyring_rotation_lifetime, 4000),
+    Timeout = genlib_app:env(kds, keyring_initialize_lifetime, 3000),
     ok = timer:sleep(Timeout + 1500),
     _ = ?assertEqual(
         {error, {invalid_activity, {initialization, uninitialized}}},
