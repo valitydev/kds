@@ -7,6 +7,8 @@
         kernel,
         stdlib,
         crypto,
+        prometheus,
+        prometheus_cowboy,
         woody,
         erl_health,
         shamir,

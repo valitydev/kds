@@ -194,10 +194,8 @@ handle_function_('CancelRekey', {}, _Context, _Opts) ->
             raise(#cds_InvalidStatus{status = Status})
     end;
 handle_function_('GetState', {}, _Context, _Opts) ->
-    case kds_keyring_manager:get_status() of
-        Status ->
-            {ok, encode_state(Status)}
-    end;
+    Status = kds_keyring_manager:get_status(),
+    {ok, encode_state(Status)};
 handle_function_('UpdateKeyringMeta', {KeyringMeta}, _Context, _Opts) ->
     try
         DecodedKeyringMeta = kds_keyring_meta:decode_keyring_meta_diff(KeyringMeta),
@@ -237,27 +235,27 @@ encode_encrypted_share(#{
     kds_keysharing:signed_masterkey_share(),
     atom()
 ) -> kds_keysharing:masterkey_share().
-verify_signed_share(ShareholderId, SignedShare, OperationId) ->
+verify_signed_share(ShareholderId, SignedShare, OperationID) ->
     case kds_shareholder:get_public_key_by_id(ShareholderId, sig) of
         {ok, PublicKey} ->
             case kds_crypto:verify(PublicKey, SignedShare) of
                 {ok, Share} ->
                     _ = logger:info(
                         "Shareholder ~w finished verification of operation ~w",
-                        [ShareholderId, OperationId]
+                        [ShareholderId, OperationID]
                     ),
                     Share;
                 {error, failed_to_verify} ->
                     _ = logger:info(
                         "Shareholder ~w failed verification of operation ~w",
-                        [ShareholderId, OperationId]
+                        [ShareholderId, OperationID]
                     ),
                     raise(#cds_VerificationFailed{})
             end;
         {error, not_found} ->
             _ = logger:info(
                 "Shareholder ~w failed verification of operation ~w",
-                [ShareholderId, OperationId]
+                [ShareholderId, OperationID]
             ),
             raise(#cds_VerificationFailed{})
     end.
